@@ -1,0 +1,119 @@
+{
+  "intents": [
+    {
+      "tag": "greeting",
+      "patterns": ["sbeh","hello", "hi", "hey", "good morning", "good afternoon", "bonjour", "salut", "coucou", "bonsoir", "menu"],
+      "responses": ["Bonjour ! Comment puis-je vous aider avec les RH aujourd'hui ?", "Salut ! Que puis-je faire pour vous ?"],
+      "suggestions": ["Solde de congés", "Signaler une absence", "Ma fiche de paie", "Contacter RH"]
+    },
+    {
+      "tag": "leave_request",
+      "patterns": ["I want to take leave", "vacation", "holiday", "time off", "leave application", "how many days can I take", "leave balance", "vacation days", "holiday entitlement", "take 5 days", "request 2 days off", "je veux prendre des congés", "vacances", "congé", "jours de congé", "combien de jours", "solde de congés", "prendre 5 jours", "demande de congé", "check balance", "take 1 day", "take 1 week", "prendre 1 jour", "prendre 1 semaine", "prendre un jour", "prendre une semaine", "poser un congé", "poser des congés", "vérifier solde", "mon solde"],
+      "responses": ["Bien sûr, je peux vous aider. Veuillez indiquer les dates et la raison de votre congé.", "Pour demander un congé, merci de préciser les dates de début et de fin.", "Selon notre politique, vous avez droit à 25 jours de congés payés par an. Votre solde dépend de votre usage."],
+      "suggestions": ["Vérifier solde", "Prendre 1 jour", "Prendre 1 semaine", "Annuler"]
+    },
+    {
+      "tag": "help",
+      "patterns": ["help", "aide", "support", "what can you do", "que peux-tu faire"],
+      "responses": ["Je peux vous aider avec les demandes de congés, la vérification de votre solde, les fiches de paie et les questions RH générales."],
+      "suggestions": ["Menu", "Contacter RH"]
+    },
+    {
+      "tag": "cancel",
+      "patterns": ["cancel", "annuler", "stop", "nevermind", "laisse tomber"],
+      "responses": ["D'accord, j'ai annulé cette action. Y a-t-il autre chose ?"],
+      "suggestions": ["Menu"]
+    },
+    {
+      "tag": "sick_leave",
+      "patterns": ["sick", "illness", "not feeling well", "doctor", "medical leave", "flu", "fever", "je suis malade", "maladie", "médecin", "arrêt maladie", "pas bien", "fièvre", "grippe"],
+      "responses": ["Je suis désolé d'apprendre que vous ne vous sentez pas bien. Veuillez prévenir votre manager et fournir un certificat médical si l'absence dépasse 2 jours.", "Pour un arrêt maladie, informez votre superviseur avant 9h et téléchargez votre certificat sur le portail RH."],
+      "suggestions": ["Signaler une absence", "Contacter RH"]
+    },
+    {
+      "tag": "maternity_paternity",
+      "patterns": ["maternity", "paternity", "parental leave", "baby", "birth", "pregnant", "maternité", "paternité", "congé parental", "bébé", "naissance", "enceinte"],
+      "responses": ["Félicitations ! Nous offrons des congés maternité et paternité complets. Contactez les RH 3 mois avant la date prévue.", "La politique de congé parental est dans le manuel de l'employé. En général, c'est 16 semaines pour la maternité et 4 semaines pour la paternité."]
+    },
+    {
+      "tag": "report_absence",
+      "patterns": ["Signaler une absence", "I will be late", "cannot come today", "absent today", "emergency", "car trouble", "je vais être en retard", "je ne peux pas venir", "absent aujourd'hui", "urgence", "panne de voiture", "retard"],
+      "responses": ["Merci de nous prévenir. Assurez-vous d'avoir également informé votre manager direct.", "Veuillez enregistrer votre absence sur le portail RH dès que possible."]
+    },
+    {
+      "tag": "payroll_general",
+      "patterns": ["payroll", "salary", "pay", "compensation", "wages", "paie", "salaire", "rémunération", "paiement"],
+      "responses": ["Pour les questions de paie, contactez le service financier ou vérifiez votre portail employé.", "Les informations sur le salaire sont disponibles sur votre tableau de bord RH."]
+    },
+    {
+      "tag": "pay_date",
+      "patterns": ["when do we get paid", "pay day", "payment date", "when is salary", "quand est la date de paie", "jour de paie", "date de paiement", "quand est le salaire", "date salaire"],
+      "responses": ["Les salaires sont versés le 25 de chaque mois. Si le 25 tombe un week-end, le paiement est effectué le vendredi précédent.", "Le jour de paie est le 25 de chaque mois."]
+    },
+    {
+      "tag": "payslip",
+      "patterns": ["payslip", "pay stub", "pay check", "where is my payslip", "fiche de paie", "bulletin de salaire", "où est ma fiche de paie", "avoir ma fiche de paie"],
+      "responses": ["Vous pouvez télécharger vos fiches de paie mensuelles dans la section 'Mes Documents' du portail RH.", "Les fiches de paie sont envoyées par email sécurisé le jour de la paie."]
+    },
+    {
+      "tag": "overtime",
+      "patterns": ["overtime", "extra hours", "working late", "heures supplémentaires", "heures sup", "travailler tard", "politique heures supplémentaires"],
+      "responses": ["Les heures supplémentaires doivent être approuvées par votre manager. Elles sont payées 1,5 fois votre taux horaire.", "Veuillez soumettre votre feuille d'heures avant le 20 du mois pour qu'elles soient incluses dans la paie."]
+    },
+    {
+      "tag": "benefits",
+      "patterns": ["benefits", "insurance", "health", "retirement", "pension", "avantages", "assurance", "santé", "retraite", "mutuelle"],
+      "responses": ["Vous trouverez des informations sur vos avantages dans le manuel de l'employé ou le portail RH.", "Pour les questions sur les avantages sociaux, veuillez contacter directement les RH."]
+    },
+    {
+      "tag": "goodbye",
+      "patterns": ["bye", "goodbye", "see you", "thanks", "au revoir", "salut", "à bientôt", "merci"],
+      "responses": ["Au revoir ! Passez une bonne journée.", "Merci d'avoir discuté. Faites-moi savoir si vous avez besoin d'autre chose."]
+    },
+    {
+      "tag": "resignation",
+      "patterns": ["resign", "quit", "notice period", "leaving the company", "démissionner", "quitter", "préavis", "départ"],
+      "responses": ["Nous sommes désolés de vous voir partir. Veuillez soumettre votre lettre de démission à votre manager et aux RH. Le préavis standard est d'un mois."]
+    },
+    {
+      "tag": "remote_work",
+      "patterns": ["remote work", "work from home", "wfh", "telecommuting", "télétravail", "travailler de la maison", "à distance"],
+      "responses": ["Notre politique autorise 2 jours de télétravail par semaine. Veuillez vous coordonner avec votre chef d'équipe."]
+    },
+    {
+      "tag": "expenses",
+      "patterns": ["expenses", "reimbursement", "claim", "travel expenses", "frais", "remboursement", "note de frais", "dépenses"],
+      "responses": ["Vous pouvez soumettre vos notes de frais via le portail financier. Les reçus doivent être téléchargés dans les 30 jours."]
+    },
+    {
+      "tag": "training",
+      "patterns": ["training", "learning", "course", "development", "budget", "formation", "apprentissage", "cours", "développement"],
+      "responses": ["Nous encourageons le développement professionnel. Chaque employé dispose d'un budget annuel de 1000 DT. Parlez-en à votre manager."]
+    },
+    {
+      "tag": "working_hours",
+      "patterns": ["working hours", "office hours", "start time", "end time", "heures de travail", "horaires", "heure de début", "heure de fin"],
+      "responses": ["Les horaires de bureau standard sont de 9h00 à 18h00, du lundi au vendredi, avec une pause déjeuner d'une heure."]
+    },
+    {
+      "tag": "dress_code",
+      "patterns": ["dress code", "what to wear", "attire", "casual friday", "code vestimentaire", "tenue", "habiller"],
+      "responses": ["Notre code vestimentaire est 'Business Casual'. Le vendredi est 'Casual Friday' et les jeans sont autorisés."]
+    },
+    {
+      "tag": "performance_review",
+      "patterns": ["performance review", "appraisal", "evaluation", "promotion", "entretien annuel", "évaluation", "promotion"],
+      "responses": ["Les entretiens annuels d'évaluation ont lieu deux fois par an, en juin et en décembre."]
+    },
+    {
+      "tag": "public_holidays",
+      "patterns": ["public holidays", "bank holidays", "days off", "calendar", "jours fériés", "fêtes", "calendrier"],
+      "responses": ["Vous trouverez la liste des jours fériés de cette année sur la page d'accueil de l'intranet de l'entreprise."]
+    },
+    {
+      "tag": "contact_hr",
+      "patterns": ["contact hr", "human resources", "speak to someone", "email hr", "contacter rh", "ressources humaines", "parler à quelqu'un"],
+      "responses": ["Vous pouvez joindre l'équipe RH à hr@company.com ou nous rendre visite au 3ème étage."]
+    }
+  ]
+}
