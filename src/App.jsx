@@ -51,7 +51,7 @@ function App() {
     { id: 2, employeeId: 1, type: "Retard", description: "Retards répétés (3 fois cette semaine)", date: "2025-12-01", status: "Nouveau", severity: "Faible", actions: [] }
   ]);
   const [clockIns, setClockIns] = useState([
-    { id: 1, employeeId: 1, date: "2025-12-02", in: "08:55", out: "18:05", status: "Présent" },
+    { id: 1, employeeId: 1, date: "2025-12-01", in: "08:55", out: "18:05", status: "Présent" },
     { id: 2, employeeId: 2, date: "2025-12-02", in: "09:45", out: null, status: "En cours" },
     { id: 3, employeeId: 3, date: "2025-12-02", in: "08:45", out: "17:30", status: "Présent" },
     { id: 4, employeeId: 4, date: "2025-12-02", in: "09:00", out: "17:00", status: "Présent" }
@@ -564,6 +564,33 @@ function App() {
     doc.save(`Fiche_Paie_${data.period.month}_${data.period.year}.pdf`);
   };
 
+  const handleClockIn = () => {
+    const today = new Date().toISOString().split("T")[0];
+    const userId = user?.id || 1;
+    
+    // Check if already clocked in
+    const existingClockIn = clockIns.find(c => c.employeeId === userId && c.date === today);
+    
+    if (existingClockIn) {
+      alert("Vous avez déjà pointé pour aujourd'hui.");
+      return;
+    }
+
+    const now = new Date();
+    const timeString = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+    
+    const newClockIn = {
+      id: clockIns.length + 1,
+      employeeId: userId,
+      date: today,
+      in: timeString,
+      out: null,
+      status: "En cours"
+    };
+
+    setClockIns([...clockIns, newClockIn]);
+    alert("Entrée enregistrée à " + timeString);
+  };
   
   const handleClockOut = () => {
     const today = new Date().toISOString().split("T")[0];
@@ -602,6 +629,10 @@ function App() {
   };
 
   const renderContent = () => {
+    const today = new Date().toISOString().split("T")[0];
+    const userId = user?.id || 1;
+    const todayClockIn = clockIns.find(c => c.employeeId === userId && c.date === today);
+
     switch (currentPage) {
       case 'dashboard':
         return isHR ? (
@@ -3778,18 +3809,28 @@ function App() {
                 <h4 className="text-lg font-bold text-gray-800 dark:text-white mb-4">Aujourd'hui</h4>
                 <div className="flex items-center justify-center py-8">
                   <div className="text-center">
-                    <div className="text-4xl font-bold text-indigo-600 dark:text-indigo-400 mb-2">08:55</div>
+                    <div className="text-4xl font-bold text-indigo-600 dark:text-indigo-400 mb-2">{todayClockIn?.in || '--:--'}</div>
                     <p className="text-gray-500 dark:text-gray-400">Heure d'arrivée</p>
                   </div>
                   <div className="mx-8 text-gray-300 dark:text-gray-600 text-2xl">→</div>
                   <div className="text-center">
-                    <div className="text-4xl font-bold text-gray-400 dark:text-gray-600 mb-2">--:--</div>
+                    <div className="text-4xl font-bold text-gray-400 dark:text-gray-600 mb-2">{todayClockIn?.out || '--:--'}</div>
                     <p className="text-gray-500 dark:text-gray-400">Heure de départ</p>
                   </div>
                 </div>
-                <button onClick={handleClockOut} className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-lg transition-all">
-                  Badger Sortie
-                </button>
+                {!todayClockIn ? (
+                  <button onClick={handleClockIn} className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-lg transition-all">
+                    Badger Entrée
+                  </button>
+                ) : !todayClockIn.out ? (
+                  <button onClick={handleClockOut} className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-lg transition-all">
+                    Badger Sortie
+                  </button>
+                ) : (
+                  <button disabled className="w-full py-3 bg-gray-400 text-white font-bold rounded-lg shadow-lg cursor-not-allowed">
+                    Journée terminée
+                  </button>
+                )}
               </div>
 
               <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md border border-gray-100 dark:border-gray-700">
