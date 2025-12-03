@@ -9,8 +9,8 @@ const Message = ({ text, sender, suggestions, onSuggestionClick, inputType, onIn
         {/* Avatar */}
         <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm mt-1 ${
           isUser 
-            ? 'bg-indigo-600 text-white' 
-            : 'bg-gradient-to-br from-indigo-500 to-indigo-600 text-white'
+            ? 'bg-brand-dark text-white' 
+            : 'bg-gradient-to-br from-brand-dark to-brand-primary text-white'
         }`}>
           {isUser ? (
             <span className="text-xs font-bold">{user ? user.username.substring(0, 2).toUpperCase() : 'ME'}</span>
@@ -23,14 +23,14 @@ const Message = ({ text, sender, suggestions, onSuggestionClick, inputType, onIn
           <div className={`
             p-4 rounded-2xl shadow-sm text-sm leading-relaxed relative
             ${isUser 
-              ? 'bg-indigo-600 text-white rounded-tr-none' 
+              ? 'bg-brand-dark text-white rounded-tr-none' 
               : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-tl-none border border-gray-100 dark:border-gray-700'}
           `}>
             <p className="whitespace-pre-wrap">{text}</p>
             {inputType === 'date' && (
               <input 
                 type="date" 
-                className="mt-3 w-full p-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                className="mt-3 w-full p-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all"
                 onChange={(e) => onInputChange(e.target.value)}
               />
             )}
@@ -46,7 +46,7 @@ const Message = ({ text, sender, suggestions, onSuggestionClick, inputType, onIn
               {suggestions.map((suggestion, index) => (
                 <button 
                   key={index} 
-                  className="px-4 py-2 bg-white dark:bg-gray-800 text-indigo-600 dark:text-white rounded-full text-xs font-bold hover:bg-indigo-50 dark:hover:bg-gray-700 transition-all shadow-sm border border-indigo-100 dark:border-gray-700 hover:shadow-md hover:-translate-y-0.5"
+                  className="px-4 py-2 bg-white dark:bg-gray-800 text-brand-dark dark:text-white rounded-full text-xs font-bold hover:bg-brand-bg dark:hover:bg-gray-700 transition-all shadow-sm border border-brand-bg dark:border-gray-700 hover:shadow-md hover:-translate-y-0.5"
                   onClick={() => onSuggestionClick(suggestion)}
                 >
                   {suggestion}

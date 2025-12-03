@@ -131,12 +131,166 @@ db.query(createPayslipsTable, (err) => {
   }
 });
 
+// Ensure clock_ins table exists
+const createClockInsTable = `
+CREATE TABLE IF NOT EXISTS clock_ins (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  date DATE NOT NULL,
+  time_in TIME NOT NULL,
+  time_out TIME,
+  status VARCHAR(50) DEFAULT 'En cours',
+  FOREIGN KEY (user_id) REFERENCES users(id)
+)`;
+
+db.query(createClockInsTable, (err) => {
+  if (err) console.error("Error creating clock_ins table:", err);
+  else console.log("clock_ins table ready");
+});
+
+// Ensure accounting tables exist
+const createClientsTable = `
+CREATE TABLE IF NOT EXISTS clients (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  email VARCHAR(255),
+  phone VARCHAR(50),
+  address TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)`;
+
+db.query(createClientsTable, (err) => {
+  if (err) console.error("Error creating clients table:", err);
+  else {
+    console.log("clients table ready");
+    // Seed Clients
+    db.query('SELECT COUNT(*) as count FROM clients', (err, res) => {
+      if (!err && res[0].count === 0) {
+        const clients = [
+          ['KYCE SARL', 'contact@kyce.tn', '+216 71 123 456', 'Les Berges du Lac 1, Tunis'],
+          ['Global Consulting', 'info@globalconsulting.com', '+216 71 987 654', 'Centre Urbain Nord, Tunis'],
+          ['StartUp Factory', 'hello@startupfactory.tn', '+216 55 000 111', 'La Marsa, Tunis'],
+          ['Design Studio', 'contact@designstudio.tn', '+216 22 333 444', 'Sidi Bou Said, Tunis']
+        ];
+        db.query('INSERT INTO clients (name, email, phone, address) VALUES ?', [clients], (err) => {
+          if (err) console.error("Error seeding clients:", err);
+          else console.log("Seeded clients data");
+        });
+      }
+    });
+  }
+});
+
+const createInvoicesTable = `
+CREATE TABLE IF NOT EXISTS invoices (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  client_id INT NOT NULL,
+  date DATE NOT NULL,
+  due_date DATE,
+  status ENUM('Payé', 'Non payé', 'En retard') DEFAULT 'Non payé',
+  total DECIMAL(10, 2) DEFAULT 0.00,
+  tax DECIMAL(10, 2) DEFAULT 0.00,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+)`;
+
+db.query(createInvoicesTable, (err) => {
+  if (err) console.error("Error creating invoices table:", err);
+  else {
+    console.log("invoices table ready");
+    // Seed Invoices (Wait a bit for clients to be ready in a real scenario, but here we assume sequential execution or retry)
+    setTimeout(() => {
+      db.query('SELECT COUNT(*) as count FROM invoices', (err, res) => {
+        if (!err && res[0].count === 0) {
+          // Assuming client IDs 1, 2, 3, 4 exist from seed
+          const invoices = [
+            [1, '2025-11-01', '2025-11-15', 'Payé', 5950.00, 950.00],
+            [2, '2025-11-20', '2025-12-05', 'En retard', 3570.00, 570.00],
+            [3, '2025-12-01', '2025-12-15', 'Non payé', 11900.00, 1900.00],
+            [1, '2025-12-02', '2025-12-16', 'Non payé', 2380.00, 380.00],
+            [4, '2025-10-15', '2025-10-30', 'Payé', 1785.00, 285.00]
+          ];
+          db.query('INSERT INTO invoices (client_id, date, due_date, status, total, tax) VALUES ?', [invoices], (err) => {
+            if (err) console.error("Error seeding invoices:", err);
+            else console.log("Seeded invoices data");
+          });
+        }
+      });
+    }, 1000);
+  }
+});
+
+const createInvoiceItemsTable = `
+CREATE TABLE IF NOT EXISTS invoice_items (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  invoice_id INT NOT NULL,
+  description VARCHAR(255) NOT NULL,
+  quantity INT DEFAULT 1,
+  unit_price DECIMAL(10, 2) DEFAULT 0.00,
+  total DECIMAL(10, 2) DEFAULT 0.00,
+  FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
+)`;
+
+db.query(createInvoiceItemsTable, (err) => {
+  if (err) console.error("Error creating invoice_items table:", err);
+  else {
+    console.log("invoice_items table ready");
+    // Ensure quantity column exists (for existing tables)
+    const alterInvoiceItems = "ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS quantity INT DEFAULT 1";
+    db.query(alterInvoiceItems, (err) => {
+      if (err) console.error("Error adding quantity to invoice_items:", err);
+      else console.log("invoice_items table updated with quantity column");
+    });
+  }
+});
+
+const createExpensesTable = `
+CREATE TABLE IF NOT EXISTS expenses (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  description VARCHAR(255) NOT NULL,
+  amount DECIMAL(10, 2) NOT NULL,
+  date DATE NOT NULL,
+  category VARCHAR(100),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)`;
+
+db.query(createExpensesTable, (err) => {
+  if (err) console.error("Error creating expenses table:", err);
+  else {
+    console.log("expenses table ready");
+    // Seed Expenses
+    db.query('SELECT COUNT(*) as count FROM expenses', (err, res) => {
+      if (!err && res[0].count === 0) {
+        const expenses = [
+          ['Achat Ordinateurs Dell XPS', 12500.00, '2025-11-05', 'Matériel'],
+          ['Licence Adobe CC', 1200.00, '2025-11-10', 'Logiciel'],
+          ['Loyer Bureau Décembre', 3500.00, '2025-12-01', 'Loyer'],
+          ['Facture Internet Topnet', 150.00, '2025-12-02', 'Autre'],
+          ['Fournitures de bureau', 450.00, '2025-11-25', 'Matériel'],
+          ['Déjeuner Client', 250.00, '2025-11-28', 'Autre'],
+          ['Hébergement Serveur AWS', 850.00, '2025-11-30', 'Logiciel']
+        ];
+        db.query('INSERT INTO expenses (description, amount, date, category) VALUES ?', [expenses], (err) => {
+          if (err) console.error("Error seeding expenses:", err);
+          else console.log("Seeded expenses data");
+        });
+      }
+    });
+  }
+});
+
 // Register Route
 app.post('/register', async (req, res) => {
-  const { username, password, post } = req.body;
+  const { username, password, post, registrationCode } = req.body;
   
   if (!username || !password) {
     return res.status(400).json({ message: 'Username and password are required' });
+  }
+
+  // Security Check: Verify Registration Code
+  const VALID_CODE = "RH2025"; // This should ideally be in an environment variable
+  if (registrationCode !== VALID_CODE) {
+    return res.status(403).json({ message: 'Code d\'inscription invalide. Contactez l\'administrateur.' });
   }
 
   try {
@@ -794,6 +948,326 @@ app.get('/api/my-payslips/:userId', (req, res) => {
     res.json(results);
   });
 });
+
+// --- Clock-In/Out Routes ---
+
+// Get Clock-Ins for User
+app.get('/api/clock-ins/:userId', (req, res) => {
+  const userId = req.params.userId;
+  const sql = 'SELECT * FROM clock_ins WHERE user_id = ? ORDER BY date DESC, time_in DESC';
+  db.query(sql, [userId], (err, results) => {
+    if (err) {
+      console.error("Error fetching clock-ins:", err);
+      return res.status(500).json({ message: 'Database error' });
+    }
+    // Format for frontend
+    const formatted = results.map(r => ({
+      id: r.id,
+      employeeId: r.user_id,
+      date: r.date.toISOString().split('T')[0], // YYYY-MM-DD
+      in: r.time_in,
+      out: r.time_out,
+      status: r.status
+    }));
+    res.json(formatted);
+  });
+});
+
+// Clock In
+app.post('/api/clock-in', (req, res) => {
+  const { userId } = req.body;
+  const date = new Date().toISOString().split('T')[0];
+  const time = new Date().toLocaleTimeString('fr-FR', { hour12: false }); // HH:MM:SS
+
+  // Check if already clocked in today
+  const checkSql = 'SELECT * FROM clock_ins WHERE user_id = ? AND date = ? AND time_out IS NULL';
+  db.query(checkSql, [userId, date], (err, results) => {
+    if (err) return res.status(500).json({ message: 'Database error' });
+    if (results.length > 0) return res.status(400).json({ message: 'Déjà pointé pour aujourd\'hui' });
+
+    const sql = 'INSERT INTO clock_ins (user_id, date, time_in, status) VALUES (?, ?, ?, "En cours")';
+    db.query(sql, [userId, date, time], (err, result) => {
+      if (err) {
+        console.error("Error clocking in:", err);
+        return res.status(500).json({ message: 'Database error' });
+      }
+      res.status(201).json({ message: 'Clock in successful', id: result.insertId, time });
+    });
+  });
+});
+
+// Clock Out
+app.put('/api/clock-out', (req, res) => {
+  const { userId } = req.body;
+  const date = new Date().toISOString().split('T')[0];
+  const time = new Date().toLocaleTimeString('fr-FR', { hour12: false });
+
+  const sql = 'UPDATE clock_ins SET time_out = ?, status = "Présent" WHERE user_id = ? AND date = ? AND time_out IS NULL';
+  db.query(sql, [time, userId, date], (err, result) => {
+    if (err) {
+      console.error("Error clocking out:", err);
+      return res.status(500).json({ message: 'Database error' });
+    }
+    if (result.affectedRows === 0) {
+      return res.status(400).json({ message: 'Aucun pointage en cours trouvé pour aujourd\'hui' });
+    }
+    res.json({ message: 'Clock out successful', time });
+  });
+});
+
+// --- Accounting API Routes ---
+
+// Clients
+app.get('/api/clients', (req, res) => {
+  db.query('SELECT * FROM clients ORDER BY created_at DESC', (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(results);
+  });
+});
+
+app.post('/api/clients', (req, res) => {
+  const { name, email, phone, address } = req.body;
+  db.query('INSERT INTO clients (name, email, phone, address) VALUES (?, ?, ?, ?)', 
+    [name, email, phone, address], 
+    (err, result) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ id: result.insertId, ...req.body });
+    }
+  );
+});
+
+app.put('/api/clients/:id', (req, res) => {
+  const { name, email, phone, address } = req.body;
+  db.query('UPDATE clients SET name=?, email=?, phone=?, address=? WHERE id=?', 
+    [name, email, phone, address, req.params.id], 
+    (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ message: 'Client updated' });
+    }
+  );
+});
+
+app.delete('/api/clients/:id', (req, res) => {
+  db.query('DELETE FROM clients WHERE id=?', [req.params.id], (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ message: 'Client deleted' });
+  });
+});
+
+// Invoices
+app.get('/api/invoices', (req, res) => {
+  const sql = `
+    SELECT i.*, c.name as client_name 
+    FROM invoices i 
+    JOIN clients c ON i.client_id = c.id 
+    ORDER BY i.date DESC
+  `;
+  db.query(sql, (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(results);
+  });
+});
+
+app.post('/api/invoices', (req, res) => {
+  const { client_id, date, due_date, items } = req.body;
+  
+  // Calculate totals
+  let total = 0;
+  items.forEach(item => total += (item.quantity * item.unit_price));
+  const tax = total * 0.19; // 19% VAT
+  const grandTotal = total + tax;
+
+  db.query('INSERT INTO invoices (client_id, date, due_date, total, tax, status) VALUES (?, ?, ?, ?, ?, "Non payé")', 
+    [client_id, date, due_date, grandTotal, tax], 
+    (err, result) => {
+      if (err) return res.status(500).json({ error: err.message });
+      
+      const invoiceId = result.insertId;
+      const itemValues = items.map(item => [invoiceId, item.description, item.quantity, item.unit_price, item.quantity * item.unit_price]);
+      
+      if (itemValues.length > 0) {
+        db.query('INSERT INTO invoice_items (invoice_id, description, quantity, unit_price, total) VALUES ?', [itemValues], (err) => {
+          if (err) console.error("Error inserting items:", err);
+        });
+      }
+      
+      res.json({ message: 'Invoice created', id: invoiceId });
+    }
+  );
+});
+
+app.get('/api/invoices/:id', (req, res) => {
+  const sql = `
+    SELECT i.*, c.name as client_name, c.address as client_address, c.email as client_email, c.phone as client_phone 
+    FROM invoices i 
+    JOIN clients c ON i.client_id = c.id 
+    WHERE i.id = ?
+  `;
+  
+  db.query(sql, [req.params.id], (err, invoiceResult) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (invoiceResult.length === 0) return res.status(404).json({ message: 'Invoice not found' });
+    
+    db.query('SELECT * FROM invoice_items WHERE invoice_id = ?', [req.params.id], (err, itemsResult) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ ...invoiceResult[0], items: itemsResult });
+    });
+  });
+});
+
+app.put('/api/invoices/:id/status', (req, res) => {
+  const { status } = req.body;
+  db.query('UPDATE invoices SET status = ? WHERE id = ?', [status, req.params.id], (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ message: 'Status updated' });
+  });
+});
+
+// Expenses
+app.get('/api/expenses', (req, res) => {
+  db.query('SELECT * FROM expenses ORDER BY date DESC', (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(results);
+  });
+});
+
+app.post('/api/expenses', (req, res) => {
+  const { description, amount, date, category } = req.body;
+  db.query('INSERT INTO expenses (description, amount, date, category) VALUES (?, ?, ?, ?)', 
+    [description, amount, date, category], 
+    (err, result) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ id: result.insertId, ...req.body });
+    }
+  );
+});
+
+app.delete('/api/expenses/:id', (req, res) => {
+  db.query('DELETE FROM expenses WHERE id=?', [req.params.id], (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ message: 'Expense deleted' });
+  });
+});
+
+// Dashboard Stats
+app.get('/api/accounting/stats', (req, res) => {
+  const stats = { income: 0, expenses: 0, net: 0, pendingInvoices: 0 };
+  
+  db.query('SELECT SUM(total) as income FROM invoices WHERE status = "Payé"', (err, result) => {
+    if (!err && result[0].income) stats.income = parseFloat(result[0].income);
+    
+    db.query('SELECT SUM(amount) as expenses FROM expenses', (err, result) => {
+      if (!err && result[0].expenses) stats.expenses = parseFloat(result[0].expenses);
+      
+      stats.net = stats.income - stats.expenses;
+      
+      db.query('SELECT COUNT(*) as count FROM invoices WHERE status = "En retard"', (err, result) => {
+        if (!err) stats.pendingInvoices = result[0].count;
+        res.json(stats);
+      });
+    });
+  });
+});
+
+// Full Accounting Data for Reports
+app.get('/api/accounting/reports/data', (req, res) => {
+  const data = { invoices: [], expenses: [], payslips: [], clients: [] };
+
+  const p1 = new Promise((resolve) => {
+    db.query('SELECT i.*, c.name as client_name FROM invoices i JOIN clients c ON i.client_id = c.id', (err, res) => {
+      if (!err) data.invoices = res;
+      resolve();
+    });
+  });
+
+  const p2 = new Promise((resolve) => {
+    db.query('SELECT * FROM expenses', (err, res) => {
+      if (!err) data.expenses = res;
+      resolve();
+    });
+  });
+
+  const p3 = new Promise((resolve) => {
+    db.query('SELECT * FROM payslips', (err, res) => {
+      if (!err) data.payslips = res;
+      resolve();
+    });
+  });
+
+  const p4 = new Promise((resolve) => {
+    db.query('SELECT * FROM clients', (err, res) => {
+      if (!err) data.clients = res;
+      resolve();
+    });
+  });
+
+  Promise.all([p1, p2, p3, p4]).then(() => {
+    res.json(data);
+  });
+});
+
+// Seed Additional Invoices with Quantities
+setTimeout(() => {
+  db.query('SELECT COUNT(*) as count FROM invoices', (err, res) => {
+    if (!err && res[0].count <= 5) { // Only if we have the initial batch or less
+      console.log("Seeding additional invoices with quantities...");
+      
+      const newInvoices = [
+        { 
+          client_id: 2, 
+          date: '2025-12-04', 
+          due_date: '2025-12-18', 
+          items: [
+            { description: 'Licence Antivirus (Poste)', quantity: 50, unit_price: 45.00 },
+            { description: 'Installation & Config', quantity: 10, unit_price: 150.00 }
+          ]
+        },
+        { 
+          client_id: 3, 
+          date: '2025-12-05', 
+          due_date: '2025-12-20', 
+          items: [
+            { description: 'Serveur Rack Dell PowerEdge', quantity: 2, unit_price: 12500.00 },
+            { description: 'Baie de stockage', quantity: 1, unit_price: 8000.00 },
+            { description: 'Câblage Réseau (Mètre)', quantity: 500, unit_price: 2.50 }
+          ]
+        },
+        {
+          client_id: 1,
+          date: '2025-12-06',
+          due_date: '2025-12-21',
+          items: [
+            { description: 'Consulting Senior (Jours)', quantity: 5, unit_price: 850.00 },
+            { description: 'Consulting Junior (Jours)', quantity: 10, unit_price: 450.00 }
+          ]
+        }
+      ];
+
+      newInvoices.forEach(inv => {
+        let total = 0;
+        inv.items.forEach(item => total += (item.quantity * item.unit_price));
+        const tax = total * 0.19;
+        const grandTotal = total + tax;
+
+        db.query('INSERT INTO invoices (client_id, date, due_date, total, tax, status) VALUES (?, ?, ?, ?, ?, "Non payé")', 
+          [inv.client_id, inv.date, inv.due_date, grandTotal, tax], 
+          (err, result) => {
+            if (!err) {
+              const invoiceId = result.insertId;
+              const itemValues = inv.items.map(item => [invoiceId, item.description, item.quantity, item.unit_price, item.quantity * item.unit_price]);
+              db.query('INSERT INTO invoice_items (invoice_id, description, quantity, unit_price, total) VALUES ?', [itemValues], (err) => {
+                if (err) console.error("Error inserting extra items:", err);
+                else console.log(`Added extra invoice ${invoiceId} with quantities`);
+              });
+            } else {
+              console.error("Error seeding extra invoice:", err);
+            }
+          }
+        );
+      });
+    }
+  });
+}, 3000); // Wait for initial seed
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

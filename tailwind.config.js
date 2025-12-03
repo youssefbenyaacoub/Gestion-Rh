@@ -9,6 +9,15 @@ module.exports = {
       fontFamily: {
         sans: ['Inter', 'sans-serif'],
       },
+      colors: {
+        brand: {
+          dark: '#0554F2',
+          medium: '#1675F2',
+          primary: '#1B8EF2',
+          light: '#22A2F2',
+          bg: '#F2F2F2',
+        }
+      },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-out',
         'slide-up': 'slideUp 0.4s ease-out',

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { jsPDF } from "jspdf";
 import ChatWindow from './components/ChatWindow';
 import Login from './components/Login';
+import EmployeePortal from './components/EmployeePortal';
+import AccountingPortal from './components/AccountingPortal';
 import './App.css';
 
 function App() {
@@ -22,7 +24,9 @@ function App() {
   const [trainings, setTrainings] = useState([
     { id: 1, title: "Sécurité Incendie", type: "Obligatoire", duration: "1 jour", participants: [1, 2], status: "Planifié", date: "2025-12-15" },
     { id: 2, title: "React Avancé", type: "Technique", duration: "3 jours", participants: [1], status: "En cours", date: "2025-12-10" },
-    { id: 3, title: "Management d'équipe", type: "Soft Skills", duration: "2 jours", participants: [3], status: "Terminé", date: "2025-11-20" }
+    { id: 3, title: "Management d'équipe", type: "Soft Skills", duration: "2 jours", participants: [3], status: "Terminé", date: "2025-11-20" },
+    { id: 4, title: "Leadership & Management", type: "Soft Skills", duration: "2 jours", participants: [], status: "Disponible", date: "2026-01-10", description: "Développez vos compétences de leader et apprenez à gérer une équipe efficacement." },
+    { id: 5, title: "Communication Non-Violente", type: "Soft Skills", duration: "1 jour", participants: [], status: "Disponible", date: "2026-01-20", description: "Améliorez vos relations professionnelles grâce à la CNV." }
   ]);
   const [evaluations, setEvaluations] = useState([
     { id: 1, employeeId: 1, type: "Annuel", year: 2025, status: "Planifié", date: "2025-12-20", reviewer: "Admin", goals: ["Améliorer React", "Mentorer junior"], feedback: [] },
@@ -224,6 +228,8 @@ function App() {
   // Modal States for Benefits
   const [isNewBenefitModalOpen, setIsNewBenefitModalOpen] = useState(false);
   const [newBenefitName, setNewBenefitName] = useState('');
+  const [isEditBenefitModalOpen, setIsEditBenefitModalOpen] = useState(false);
+  const [editingBenefit, setEditingBenefit] = useState(null);
 
   // Modal States for Offboarding
   const [isOffboardingModalOpen, setIsOffboardingModalOpen] = useState(false);
@@ -326,6 +332,12 @@ function App() {
         .then(res => res.json())
         .then(data => setNotifications({ leave: data.leave_notifications, payslip: data.payslip_notifications }))
         .catch(err => console.error("Error fetching notifications:", err));
+
+      // Fetch clock-ins
+      fetch(`http://localhost:5000/api/clock-ins/${user.id}`)
+        .then(res => res.json())
+        .then(data => setClockIns(Array.isArray(data) ? data : []))
+        .catch(err => console.error("Error fetching clock-ins:", err));
     }
   }, [isHR, user]);
 
@@ -576,39 +588,53 @@ function App() {
       return;
     }
 
-    const now = new Date();
-    const timeString = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-    
-    const newClockIn = {
-      id: clockIns.length + 1,
-      employeeId: userId,
-      date: today,
-      in: timeString,
-      out: null,
-      status: "En cours"
-    };
-
-    setClockIns([...clockIns, newClockIn]);
-    alert("Entrée enregistrée à " + timeString);
+    fetch('http://localhost:5000/api/clock-in', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.message === 'Clock in successful') {
+        const newClockIn = {
+          id: data.id,
+          employeeId: userId,
+          date: today,
+          in: data.time,
+          out: null,
+          status: "En cours"
+        };
+        setClockIns([newClockIn, ...clockIns]);
+        alert("Entrée enregistrée à " + data.time);
+      } else {
+        alert(data.message);
+      }
+    })
+    .catch(err => console.error("Error clocking in:", err));
   };
   
   const handleClockOut = () => {
-    const today = new Date().toISOString().split("T")[0];
     const userId = user?.id || 1;
     
-    // Find today's clock-in
-    const clockInIndex = clockIns.findIndex(c => c.employeeId === userId && c.date === today && c.out === null);
-    
-    if (clockInIndex !== -1) {
-      const newClockIns = [...clockIns];
-      const now = new Date();
-      const timeString = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-      newClockIns[clockInIndex] = { ...newClockIns[clockInIndex], out: timeString, status: 'Présent' };
-      setClockIns(newClockIns);
-      alert("Sortie enregistrée à " + timeString);
-    } else {
-      alert("Aucun pointage d'entrée trouvé pour aujourd'hui ou vous êtes déjà sorti.");
-    }
+    fetch('http://localhost:5000/api/clock-out', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.message === 'Clock out successful') {
+        setClockIns(prev => prev.map(c => 
+          (c.employeeId === userId && c.out === null) 
+            ? { ...c, out: data.time, status: 'Présent' } 
+            : c
+        ));
+        alert("Sortie enregistrée à " + data.time);
+      } else {
+        alert(data.message);
+      }
+    })
+    .catch(err => console.error("Error clocking out:", err));
   };
 
   const handleLikePost = (postId) => {
@@ -687,7 +713,7 @@ function App() {
               <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300 border border-gray-100 dark:border-gray-700">
                 <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Congés Annuels</h3>
                 <div className="text-3xl font-bold text-gray-800 dark:text-white mb-1">25 <span className="text-sm font-normal text-gray-500">Jours</span></div>
-                <div className="text-xs text-indigo-500 font-medium">Droit total</div>
+                <div className="text-xs text-brand-primary font-medium">Droit total</div>
               </div>
               <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300 border border-gray-100 dark:border-gray-700">
                 <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Restant</h3>
@@ -706,9 +732,9 @@ function App() {
                 <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">Activité Récente</h3>
                 <div className="space-y-4">
                   {/* Always show login */}
-                  <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border-l-4 border-indigo-500">
+                  <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border-l-4 border-brand-primary">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 rounded-full">
+                      <div className="p-2 bg-brand-bg dark:bg-blue-900 text-brand-dark dark:text-blue-300 rounded-full">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
                       </div>
                       <div>
@@ -760,7 +786,7 @@ function App() {
               
                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300 border border-gray-100 dark:border-gray-700">
                 <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">Annonces Entreprise</h3>
-                <div className="bg-gradient-to-r from-purple-500 to-indigo-600 rounded-lg p-4 text-white shadow-md">
+                <div className="bg-gradient-to-r from-purple-500 to-brand-primary rounded-lg p-4 text-white shadow-md">
                     <h4 className="font-bold text-lg mb-1">Fête de fin d'année</h4>
                     <p className="text-purple-100 text-sm">N'oubliez pas de répondre pour la fête annuelle !</p>
                 </div>
@@ -773,7 +799,7 @@ function App() {
         return (
           <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 max-w-2xl mx-auto animate-fade-in">
             <div className="flex items-center space-x-6 mb-8">
-              <div className="w-24 h-24 bg-indigo-600 text-white rounded-full flex items-center justify-center text-3xl font-bold shadow-lg">
+              <div className="w-24 h-24 bg-brand-primary text-white rounded-full flex items-center justify-center text-3xl font-bold shadow-lg">
                 {user.username.substring(0, 2).toUpperCase()}
               </div>
               <div>
@@ -808,7 +834,7 @@ function App() {
           <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300 border border-gray-100 dark:border-gray-700 animate-fade-in">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold text-gray-800 dark:text-white">Mes Demandes de Congés</h3>
-              <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 transition-colors shadow-sm flex items-center gap-2" onClick={() => setIsChatOpen(true)}>
+              <button className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-dark shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 transition-colors shadow-sm flex items-center gap-2" onClick={() => setIsChatOpen(true)}>
                 <span>+ Nouvelle Demande</span>
               </button>
             </div>
@@ -818,7 +844,7 @@ function App() {
                 {leaveRequests.map(req => (
                   <div className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-100 dark:border-gray-600 hover:shadow-md transition-shadow" key={req.id}>
                     <div className="flex items-center gap-4 mb-2 md:mb-0">
-                      <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 rounded-full flex items-center justify-center">
+                      <div className="w-12 h-12 bg-brand-bg dark:bg-blue-900 text-brand-dark dark:text-blue-300 rounded-full flex items-center justify-center">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
                       </div>
                       <div>
@@ -839,7 +865,7 @@ function App() {
             ) : (
               <div className="text-center py-12 bg-gray-50 dark:bg-gray-700 rounded-lg border-2 border-dashed border-gray-200 dark:border-gray-600">
                 <p className="text-gray-500 dark:text-gray-400">Vous n'avez aucune demande en cours.</p>
-                <button className="mt-4 text-indigo-600 hover:underline" onClick={() => setIsChatOpen(true)}>Faire une demande via le chat</button>
+                <button className="mt-4 text-brand-primary hover:underline" onClick={() => setIsChatOpen(true)}>Faire une demande via le chat</button>
               </div>
             )}
           </div>
@@ -883,12 +909,12 @@ function App() {
             <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-6">Mon Équipe</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
-                <div className="w-12 h-12 bg-indigo-500 text-white rounded-full flex items-center justify-center font-bold text-lg shadow-md">
+                <div className="w-12 h-12 bg-brand-primary text-white rounded-full flex items-center justify-center font-bold text-lg shadow-md">
                   JD
                 </div>
                 <div>
                   <h4 className="font-bold text-gray-800 dark:text-white">Jean Dupont</h4>
-                  <p className="text-sm text-indigo-600 dark:text-white font-medium">Manager</p>
+                  <p className="text-sm text-brand-primary dark:text-white font-medium">Manager</p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">jean.dupont@company.com</p>
                 </div>
               </div>
@@ -925,7 +951,7 @@ function App() {
                   setNewJobTitle('');
                   setIsNewJobModalOpen(true);
                 }}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 transition-colors shadow-sm flex items-center gap-2"
+                className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-dark shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 transition-colors shadow-sm flex items-center gap-2"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
                 <span>Nouvelle Offre</span>
@@ -933,8 +959,8 @@ function App() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              <div className="bg-indigo-50 dark:bg-gray-700 p-4 rounded-lg border border-indigo-100 dark:border-gray-600">
-                <h4 className="text-sm font-medium text-indigo-600 dark:text-indigo-300 uppercase">Postes Ouverts</h4>
+              <div className="bg-brand-bg dark:bg-gray-700 p-4 rounded-lg border border-brand-bg dark:border-gray-600">
+                <h4 className="text-sm font-medium text-brand-primary dark:text-blue-300 uppercase">Postes Ouverts</h4>
                 <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{jobOffers.length}</p>
               </div>
               <div className="bg-purple-50 dark:bg-gray-700 p-4 rounded-lg border border-purple-100 dark:border-gray-600">
@@ -978,7 +1004,7 @@ function App() {
                               setEditJobTitle(job.title);
                               setIsEditJobModalOpen(true);
                             }}
-                            className="text-indigo-600 hover:text-indigo-800 dark:text-white dark:hover:text-indigo-300 text-sm font-medium"
+                            className="text-brand-primary hover:text-brand-dark dark:text-white dark:hover:text-blue-300 text-sm font-medium"
                           >
                             Éditer
                           </button>
@@ -1013,7 +1039,7 @@ function App() {
                             <button onClick={() => {
                               setCvCandidate(c);
                               setIsCVModalOpen(true);
-                            }} className="flex items-center gap-1 text-indigo-600 hover:underline text-sm">
+                            }} className="flex items-center gap-1 text-brand-primary hover:underline text-sm">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                                 {c.cv}
                             </button>
@@ -1029,7 +1055,7 @@ function App() {
                             ) : (
                                 <button 
                                     onClick={() => handleAnalyzeCV(c.id)}
-                                    className="px-3 py-1 bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300 text-xs font-bold rounded-full hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-colors"
+                                    className="px-3 py-1 bg-brand-bg text-brand-dark dark:bg-blue-900 dark:text-blue-300 text-xs font-bold rounded-full hover:bg-gray-200 dark:hover:bg-blue-800 transition-colors"
                                 >
                                     Analyser ATS
                                 </button>
@@ -1037,7 +1063,7 @@ function App() {
                         </td>
                         <td className="py-3">
                           <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                            c.status === 'Nouveau' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200' :
+                            c.status === 'Nouveau' ? 'bg-brand-bg text-brand-dark dark:bg-blue-900 dark:text-blue-200' :
                             c.status === 'Entretien' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
                             'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                           }`}>{c.status}</span>
@@ -1045,7 +1071,7 @@ function App() {
                         <td className="py-3">
                           <button 
                             onClick={() => setSelectedCandidate(c)}
-                            className="text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400"
+                            className="text-gray-400 hover:text-brand-primary dark:hover:text-blue-400"
                           >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
                           </button>
@@ -1076,7 +1102,7 @@ function App() {
                             <p className="text-sm text-gray-500 dark:text-gray-400">{c.role}</p>
                           </div>
                         </div>
-                        <button className="text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded border border-indigo-100 hover:bg-indigo-100" onClick={() => {
+                        <button className="text-xs bg-brand-bg text-brand-primary px-2 py-1 rounded border border-brand-bg hover:bg-gray-200" onClick={() => {
                           setContractCandidate(c);
                           setIsContractModalOpen(true);
                         }}>
@@ -1131,7 +1157,7 @@ function App() {
               <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 animate-fade-in p-4">
                 <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden transform transition-all scale-100">
                   {/* Header with gradient */}
-                  <div className="relative h-32 bg-gradient-to-r from-indigo-600 to-indigo-600">
+                  <div className="relative h-32 bg-gradient-to-r from-brand-primary to-brand-dark">
                     <button 
                       onClick={() => setSelectedCandidate(null)}
                       className="absolute top-4 right-4 text-white/80 hover:text-white bg-black/20 hover:bg-black/40 rounded-full p-1 transition-colors"
@@ -1140,7 +1166,7 @@ function App() {
                     </button>
                     <div className="absolute -bottom-12 left-8">
                         <div className="w-24 h-24 bg-white dark:bg-gray-800 p-1 rounded-full shadow-lg">
-                            <div className="w-full h-full bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 rounded-full flex items-center justify-center text-3xl font-bold">
+                            <div className="w-full h-full bg-brand-bg dark:bg-blue-900 text-brand-primary dark:text-blue-300 rounded-full flex items-center justify-center text-3xl font-bold">
                                 {selectedCandidate.name.substring(0, 2).toUpperCase()}
                             </div>
                         </div>
@@ -1151,10 +1177,10 @@ function App() {
                     <div className="flex justify-between items-start mb-6">
                         <div>
                             <h3 className="text-2xl font-bold text-gray-800 dark:text-white">{selectedCandidate.name}</h3>
-                            <p className="text-indigo-600 dark:text-white font-medium text-lg">{selectedCandidate.role}</p>
+                            <p className="text-brand-primary dark:text-white font-medium text-lg">{selectedCandidate.role}</p>
                         </div>
                         <span className={`px-3 py-1 rounded-full text-sm font-bold ${
-                            selectedCandidate.status === 'Nouveau' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200' :
+                            selectedCandidate.status === 'Nouveau' ? 'bg-brand-bg text-brand-dark dark:bg-blue-900 dark:text-blue-200' :
                             selectedCandidate.status === 'Entretien' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
                             'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                         }`}>
@@ -1172,7 +1198,7 @@ function App() {
                             <button onClick={() => {
                                 setDownloadDocName(selectedCandidate.cv);
                                 setIsDownloadModalOpen(true);
-                            }} className="text-indigo-600 hover:underline font-medium flex items-center gap-1">
+                            }} className="text-brand-primary hover:underline font-medium flex items-center gap-1">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                                 {selectedCandidate.cv}
                             </button>
@@ -1209,7 +1235,7 @@ function App() {
                                 setInterviewDate(new Date().toLocaleString());
                                 setIsInterviewModalOpen(true);
                             }}
-                            className="flex-1 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 rounded-xl font-semibold transition-colors shadow-lg shadow-indigo-500/30 flex items-center justify-center gap-2"
+                            className="flex-1 py-3 px-4 bg-brand-primary hover:bg-brand-dark text-white shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 rounded-xl font-semibold transition-colors shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2"
                         >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                             Planifier Entretien
@@ -1267,7 +1293,7 @@ function App() {
                           setNewJobTitle('');
                         }
                       }}
-                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5"
+                      className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-dark shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5"
                     >
                       Créer
                     </button>
@@ -1302,7 +1328,7 @@ function App() {
                           setIsEditJobModalOpen(false);
                         }
                       }}
-                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5"
+                      className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-dark shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5"
                     >
                       Sauvegarder
                     </button>
@@ -1315,7 +1341,7 @@ function App() {
             {isCVModalOpen && cvCandidate && (
               <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 animate-fade-in p-4">
                 <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 text-center">
-                  <div className="w-16 h-16 bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <div className="w-16 h-16 bg-brand-bg dark:bg-blue-900 text-brand-primary dark:text-blue-300 rounded-full flex items-center justify-center mx-auto mb-4">
                     <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                   </div>
                   <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-2">Télécharger le CV</h3>
@@ -1333,7 +1359,7 @@ function App() {
                         setIsDownloadModalOpen(true);
                         setIsCVModalOpen(false);
                       }}
-                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5"
+                      className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-dark shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5"
                     >
                       Télécharger
                     </button>
@@ -1401,7 +1427,7 @@ function App() {
                           setIsInterviewModalOpen(false);
                         }
                       }}
-                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5"
+                      className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-dark shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5"
                     >
                       Confirmer
                     </button>
@@ -1507,7 +1533,7 @@ function App() {
                                 className="w-20 p-1 bg-gray-50 dark:bg-gray-600 border border-gray-200 dark:border-gray-500 rounded text-center"
                             />
                         </td>
-                        <td className="p-4 font-bold text-indigo-600 dark:text-white">
+                        <td className="p-4 font-bold text-brand-primary dark:text-white">
                             {total.toFixed(2)} DT
                         </td>
                         <td className="p-4">
@@ -1563,7 +1589,7 @@ function App() {
                     <tr key={emp.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b dark:border-gray-700 last:border-0">
                       <td className="p-4 font-medium">#{emp.id}</td>
                       <td className="p-4 flex items-center gap-3">
-                        <div className="w-8 h-8 bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 rounded-full flex items-center justify-center text-xs font-bold">
+                        <div className="w-8 h-8 bg-brand-bg dark:bg-blue-900 text-brand-primary dark:text-blue-300 rounded-full flex items-center justify-center text-xs font-bold">
                           {emp.username.substring(0, 2).toUpperCase()}
                         </div>
                         <div>
@@ -1587,7 +1613,7 @@ function App() {
                       <td className="p-4">
                         <button 
                             onClick={() => setSelectedEmployee(emp)}
-                            className="text-indigo-600 hover:text-indigo-800 dark:text-white dark:hover:text-indigo-300 text-sm font-medium flex items-center gap-1"
+                            className="text-brand-primary hover:text-brand-dark dark:text-white dark:hover:text-blue-300 text-sm font-medium flex items-center gap-1"
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                             Dossier
@@ -1604,12 +1630,12 @@ function App() {
                     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
                         <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-700/50">
                             <div className="flex items-center gap-4">
-                                <div className="w-16 h-16 bg-indigo-600 text-white rounded-full flex items-center justify-center text-2xl font-bold shadow-lg">
+                                <div className="w-16 h-16 bg-brand-primary text-white rounded-full flex items-center justify-center text-2xl font-bold shadow-lg">
                                     {selectedEmployee.username.substring(0, 2).toUpperCase()}
                                 </div>
                                 <div>
                                     <h3 className="text-2xl font-bold text-gray-800 dark:text-white">{selectedEmployee.username}</h3>
-                                    <p className="text-indigo-600 dark:text-white font-medium">{selectedEmployee.role}</p>
+                                    <p className="text-brand-primary dark:text-white font-medium">{selectedEmployee.role}</p>
                                     <p className="text-xs text-gray-500 dark:text-gray-400">ID: #{selectedEmployee.id} • Embauché le {new Date(selectedEmployee.created_at).toLocaleDateString()}</p>
                                 </div>
                             </div>
@@ -1621,24 +1647,24 @@ function App() {
                         <div className="flex border-b border-gray-100 dark:border-gray-700">
                             <button 
                                 onClick={() => setActiveTab('info')}
-                                className={`flex-1 py-4 text-sm font-semibold transition-colors relative ${activeTab === 'info' ? 'text-indigo-600 dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                                className={`flex-1 py-4 text-sm font-semibold transition-colors relative ${activeTab === 'info' ? 'text-brand-primary dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
                             >
                                 Informations
-                                {activeTab === 'info' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-600 dark:bg-indigo-400"></div>}
+                                {activeTab === 'info' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-brand-primary dark:bg-blue-400"></div>}
                             </button>
                             <button 
                                 onClick={() => setActiveTab('docs')}
-                                className={`flex-1 py-4 text-sm font-semibold transition-colors relative ${activeTab === 'docs' ? 'text-indigo-600 dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                                className={`flex-1 py-4 text-sm font-semibold transition-colors relative ${activeTab === 'docs' ? 'text-brand-primary dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
                             >
                                 Documents
-                                {activeTab === 'docs' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-600 dark:bg-indigo-400"></div>}
+                                {activeTab === 'docs' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-brand-primary dark:bg-blue-400"></div>}
                             </button>
                             <button 
                                 onClick={() => setActiveTab('leaves')}
-                                className={`flex-1 py-4 text-sm font-semibold transition-colors relative ${activeTab === 'leaves' ? 'text-indigo-600 dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                                className={`flex-1 py-4 text-sm font-semibold transition-colors relative ${activeTab === 'leaves' ? 'text-brand-primary dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
                             >
                                 Congés & Absences
-                                {activeTab === 'leaves' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-600 dark:bg-indigo-400"></div>}
+                                {activeTab === 'leaves' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-brand-primary dark:bg-blue-400"></div>}
                             </button>
                         </div>
 
@@ -1652,30 +1678,30 @@ function App() {
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Téléphone</label>
-                                            <input type="text" defaultValue={selectedEmployee.phone} className="w-full p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                            <input type="text" defaultValue={selectedEmployee.phone} className="w-full p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-brand-primary outline-none" />
                                         </div>
                                         <div className="col-span-2">
                                             <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Adresse Postale</label>
-                                            <input type="text" defaultValue={selectedEmployee.address} className="w-full p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                            <input type="text" defaultValue={selectedEmployee.address} className="w-full p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-brand-primary outline-none" />
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Poste Actuel</label>
-                                            <input type="text" defaultValue={selectedEmployee.role} className="w-full p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                            <input type="text" defaultValue={selectedEmployee.role} className="w-full p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-brand-primary outline-none" />
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Département</label>
-                                            <input type="text" defaultValue={selectedEmployee.department} className="w-full p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                            <input type="text" defaultValue={selectedEmployee.department} className="w-full p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-brand-primary outline-none" />
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Salaire Brut Annuel</label>
                                             <div className="relative">
-                                                <input type="text" defaultValue={selectedEmployee.salary} className="w-full p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 outline-none pl-8" />
+                                                <input type="text" defaultValue={selectedEmployee.salary} className="w-full p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-brand-primary outline-none pl-8" />
                                                 <span className="absolute left-3 top-2 text-gray-500">DT</span>
                                             </div>
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Fin de Contrat</label>
-                                            <input type="date" defaultValue={selectedEmployee.contract_end_date} className="w-full p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                            <input type="date" defaultValue={selectedEmployee.contract_end_date} className="w-full p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-brand-primary outline-none" />
                                         </div>
                                     </div>
                                     <div className="flex justify-between mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
@@ -1687,7 +1713,7 @@ function App() {
                                         }} className="px-4 py-2 bg-purple-50 text-purple-600 hover:bg-purple-100 rounded-lg font-semibold transition-colors border border-purple-200">
                                             Gérer Mutation / Promotion
                                         </button>
-                                        <button onClick={() => showNotification("Informations mises à jour avec succès")} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 rounded-lg font-semibold transition-colors">
+                                        <button onClick={() => showNotification("Informations mises à jour avec succès")} className="px-4 py-2 bg-brand-primary hover:bg-brand-dark text-white shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 rounded-lg font-semibold transition-colors">
                                             Enregistrer les modifications
                                         </button>
                                     </div>
@@ -1704,15 +1730,15 @@ function App() {
                                                 setNewDocName('');
                                                 setNewDocType('Autre');
                                                 setIsAddDocModalOpen(true);
-                                            }} className="text-sm bg-indigo-50 text-indigo-600 px-3 py-1 rounded-lg hover:bg-indigo-100 border border-indigo-200 transition-colors">
+                                            }} className="text-sm bg-brand-bg text-brand-primary px-3 py-1 rounded-lg hover:bg-gray-200 border border-brand-bg transition-colors">
                                                 + Ajouter un document
                                             </button>
                                         </div>
                                         <div className="grid grid-cols-1 gap-3">
                                             {(selectedEmployee.documents || []).filter(d => !d.archived).map((doc, idx) => (
-                                                <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-100 dark:border-gray-600 group hover:border-indigo-300 transition-colors">
+                                                <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-100 dark:border-gray-600 group hover:border-brand-primary transition-colors">
                                                     <div className="flex items-center gap-3">
-                                                        <div className={`p-2 rounded ${doc.type === 'Contrat' ? 'bg-indigo-100 text-indigo-600' : doc.type === 'CIN' ? 'bg-purple-100 text-purple-600' : 'bg-gray-200 text-gray-600'}`}>
+                                                        <div className={`p-2 rounded ${doc.type === 'Contrat' ? 'bg-brand-bg text-brand-primary' : doc.type === 'CIN' ? 'bg-purple-100 text-purple-600' : 'bg-gray-200 text-gray-600'}`}>
                                                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                                                         </div>
                                                         <div>
@@ -1724,7 +1750,7 @@ function App() {
                                                         <button onClick={() => {
                                                             setDownloadDocName(doc.name);
                                                             setIsDownloadModalOpen(true);
-                                                        }} className="p-1 text-gray-500 hover:text-indigo-600" title="Télécharger">
+                                                        }} className="p-1 text-gray-500 hover:text-brand-primary" title="Télécharger">
                                                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                                                         </button>
                                                         <button onClick={() => {
@@ -1768,7 +1794,7 @@ function App() {
                                                             setEmployees(employees.map(e => e.id === selectedEmployee.id ? updatedEmp : e));
                                                             setSelectedEmployee(updatedEmp);
                                                             showNotification("Document restauré");
-                                                        }} className="text-xs text-indigo-500 hover:underline">Restaurer</button>
+                                                        }} className="text-xs text-brand-primary hover:underline">Restaurer</button>
                                                     </div>
                                                 ))}
                                             </div>
@@ -1821,10 +1847,10 @@ function App() {
             <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300 border border-gray-100 dark:border-gray-700">
               <div className="flex items-center justify-between mb-4">
                 <h4 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                  <span className="w-2 h-8 bg-indigo-500 rounded-full"></span>
+                  <span className="w-2 h-8 bg-brand-primary rounded-full"></span>
                   Demandes de Congés
                 </h4>
-                <span className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 text-xs font-bold px-2 py-1 rounded-full">{pendingRequests.length} en attente</span>
+                <span className="bg-brand-bg text-brand-dark dark:bg-blue-900 dark:text-blue-200 text-xs font-bold px-2 py-1 rounded-full">{pendingRequests.length} en attente</span>
               </div>
               
               {pendingRequests.length > 0 ? (
@@ -1833,7 +1859,7 @@ function App() {
                     <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 hover:shadow-md transition-shadow" key={`leave-${req.id}`}>
                       <div className="flex justify-between items-start mb-3">
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 bg-indigo-200 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-200 rounded-full flex items-center justify-center font-bold text-xs">
+                          <div className="w-8 h-8 bg-blue-200 dark:bg-blue-800 text-brand-dark dark:text-blue-200 rounded-full flex items-center justify-center font-bold text-xs">
                             {req.username.substring(0, 2).toUpperCase()}
                           </div>
                           <div>
@@ -1979,7 +2005,7 @@ function App() {
                             setNewTrainingTitle('');
                             setIsNewTrainingModalOpen(true);
                         }}
-                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 transition-colors shadow-sm flex items-center gap-2 text-sm font-medium"
+                        className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-dark shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 transition-colors shadow-sm flex items-center gap-2 text-sm font-medium"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
                         Nouvelle Formation
@@ -1989,14 +2015,14 @@ function App() {
 
             {/* KPI Cards */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800">
-                    <h4 className="font-bold text-indigo-800 dark:text-indigo-300 mb-2">Plan Annuel 2025</h4>
+                <div className="bg-brand-bg dark:bg-blue-900/20 p-4 rounded-xl border border-brand-bg dark:border-blue-800">
+                    <h4 className="font-bold text-brand-dark dark:text-blue-300 mb-2">Plan Annuel 2025</h4>
                     <div className="flex justify-between items-end mb-2">
-                        <span className="text-3xl font-bold text-indigo-600 dark:text-white">65%</span>
-                        <span className="text-sm text-indigo-600 dark:text-white mb-1">Réalisé</span>
+                        <span className="text-3xl font-bold text-brand-primary dark:text-white">65%</span>
+                        <span className="text-sm text-brand-primary dark:text-white mb-1">Réalisé</span>
                     </div>
-                    <div className="w-full bg-indigo-200 dark:bg-indigo-800 rounded-full h-2">
-                        <div className="bg-indigo-600 h-2 rounded-full" style={{ width: '65%' }}></div>
+                    <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
+                        <div className="bg-brand-primary h-2 rounded-full" style={{ width: '65%' }}></div>
                     </div>
                 </div>
                 <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-xl border border-purple-100 dark:border-purple-800">
@@ -2019,7 +2045,7 @@ function App() {
                 {/* Main Training List (Plan Annuel) */}
                 <div className="lg:col-span-2 space-y-6">
                     <h4 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                        <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                        <svg className="w-5 h-5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                         Plan de Formation en cours
                     </h4>
                     <div className="grid grid-cols-1 gap-4">
@@ -2030,12 +2056,12 @@ function App() {
                                         <h5 className="font-bold text-gray-800 dark:text-white text-lg">{training.title}</h5>
                                         <div className="flex gap-2 mt-1">
                                             <span className="text-xs font-semibold px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-full">{training.type}</span>
-                                            <span className="text-xs font-semibold px-2 py-1 bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 rounded-full">Compétence Clé</span>
+                                            <span className="text-xs font-semibold px-2 py-1 bg-brand-bg dark:bg-brand-dark text-brand-dark dark:text-brand-primary/70 rounded-full">Compétence Clé</span>
                                         </div>
                                     </div>
                                     <span className={`px-2 py-1 rounded text-xs font-bold ${
                                         training.status === 'Terminé' ? 'bg-green-100 text-green-800' :
-                                        training.status === 'En cours' ? 'bg-indigo-100 text-indigo-800' :
+                                        training.status === 'En cours' ? 'bg-brand-bg text-brand-dark' :
                                         'bg-yellow-100 text-yellow-800'
                                     }`}>
                                         {training.status}
@@ -2059,7 +2085,7 @@ function App() {
                                             {training.participants.map(pId => {
                                                 const emp = employees.find(e => e.id === pId);
                                                 return emp ? (
-                                                    <div key={pId} className="w-8 h-8 rounded-full bg-indigo-500 text-white flex items-center justify-center text-xs font-bold border-2 border-white dark:border-gray-700" title={emp.username}>
+                                                    <div key={pId} className="w-8 h-8 rounded-full bg-brand-primary text-white flex items-center justify-center text-xs font-bold border-2 border-white dark:border-gray-700" title={emp.username}>
                                                         {emp.username.substring(0, 2).toUpperCase()}
                                                     </div>
                                                 ) : null;
@@ -2076,7 +2102,7 @@ function App() {
                                             </button>
                                         </div>
                                         {training.status === 'Terminé' && (
-                                            <button onClick={() => showNotification("Génération des certificats pour " + training.title)} className="text-xs text-indigo-600 hover:underline flex items-center gap-1">
+                                            <button onClick={() => showNotification("Génération des certificats pour " + training.title)} className="text-xs text-brand-primary hover:underline flex items-center gap-1">
                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                                 Certificats
                                             </button>
@@ -2097,10 +2123,10 @@ function App() {
                             <div>
                                 <div className="flex justify-between text-xs mb-1">
                                     <span className="text-gray-600 dark:text-gray-300">React / Node.js</span>
-                                    <span className="font-bold text-indigo-600">85%</span>
+                                    <span className="font-bold text-brand-primary">85%</span>
                                 </div>
                                 <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
-                                    <div className="bg-indigo-600 h-1.5 rounded-full" style={{width: '85%'}}></div>
+                                    <div className="bg-brand-primary h-1.5 rounded-full" style={{width: '85%'}}></div>
                                 </div>
                             </div>
                             <div>
@@ -2128,19 +2154,19 @@ function App() {
                     </div>
 
                     {/* E-Learning Platform */}
-                    <div className="bg-indigo-50 dark:bg-indigo-900/20 p-5 rounded-xl border border-indigo-100 dark:border-indigo-800">
-                        <h4 className="font-bold text-indigo-800 dark:text-indigo-300 mb-4 text-sm uppercase flex items-center gap-2">
+                    <div className="bg-brand-bg/50 dark:bg-brand-dark/20 p-5 rounded-xl border border-brand-primary/20 dark:border-brand-dark">
+                        <h4 className="font-bold text-brand-dark dark:text-brand-primary/70 mb-4 text-sm uppercase flex items-center gap-2">
                             <span>🎓</span> Plateforme E-Learning
                         </h4>
                         <div className="space-y-3">
-                            <div className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-indigo-100 dark:border-indigo-900 flex gap-3">
-                                <div className="w-10 h-10 bg-indigo-100 rounded flex items-center justify-center text-lg">🔒</div>
+                            <div className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-brand-primary/20 dark:border-brand-dark flex gap-3">
+                                <div className="w-10 h-10 bg-brand-bg rounded flex items-center justify-center text-lg">🔒</div>
                                 <div>
                                     <h5 className="font-bold text-xs text-gray-800 dark:text-white">Cybersécurité Avancée</h5>
                                     <p className="text-xs text-gray-500">2h 30m • En cours</p>
                                 </div>
                             </div>
-                            <div className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-indigo-100 dark:border-indigo-900 flex gap-3">
+                            <div className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-brand-primary/20 dark:border-brand-dark flex gap-3">
                                 <div className="w-10 h-10 bg-green-100 rounded flex items-center justify-center text-lg">🌱</div>
                                 <div>
                                     <h5 className="font-bold text-xs text-gray-800 dark:text-white">RSE & Impact</h5>
@@ -2148,7 +2174,7 @@ function App() {
                                 </div>
                             </div>
                         </div>
-                        <button className="w-full mt-3 py-1.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 transition-colors">
+                        <button className="w-full mt-3 py-1.5 bg-brand-primary text-white text-xs rounded hover:bg-brand-primary/90 transition-colors">
                             Accéder au catalogue
                         </button>
                     </div>
@@ -2158,7 +2184,7 @@ function App() {
                         <h4 className="font-bold text-gray-800 dark:text-white mb-4 text-sm uppercase">Certifications Internes</h4>
                         <div className="flex flex-wrap gap-2">
                             <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-bold rounded border border-yellow-200">Expert Java</span>
-                            <span className="px-2 py-1 bg-indigo-100 text-indigo-800 text-xs font-bold rounded border border-indigo-200">Scrum Master</span>
+                            <span className="px-2 py-1 bg-brand-bg text-brand-dark text-xs font-bold rounded border border-brand-primary/30">Scrum Master</span>
                             <span className="px-2 py-1 bg-red-100 text-red-800 text-xs font-bold rounded border border-red-200">Secouriste</span>
                             <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-bold rounded border border-gray-200">+ Ajouter</span>
                         </div>
@@ -2173,19 +2199,19 @@ function App() {
           <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300 border border-gray-100 dark:border-gray-700 animate-fade-in">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold text-gray-800 dark:text-white">Performance & Évaluation</h3>
-              <button className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm">
+              <button className="bg-brand-primary hover:bg-brand-primary/90 text-white shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
                 Nouvelle Évaluation
               </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800">
-                    <h4 className="font-bold text-indigo-800 dark:text-indigo-300 mb-2">Campagne 2025</h4>
+                <div className="bg-brand-bg/50 dark:bg-brand-dark/20 p-4 rounded-xl border border-brand-primary/20 dark:border-brand-dark">
+                    <h4 className="font-bold text-brand-dark dark:text-brand-primary/70 mb-2">Campagne 2025</h4>
                     <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 mb-2">
-                        <div className="bg-indigo-600 h-2.5 rounded-full" style={{ width: '45%' }}></div>
+                        <div className="bg-brand-primary h-2.5 rounded-full" style={{ width: '45%' }}></div>
                     </div>
-                    <p className="text-xs text-indigo-600 dark:text-white">45% des entretiens réalisés</p>
+                    <p className="text-xs text-brand-primary dark:text-white">45% des entretiens réalisés</p>
                 </div>
                 <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-xl border border-purple-100 dark:border-purple-800">
                     <h4 className="font-bold text-purple-800 dark:text-purple-300 mb-2">Objectifs Atteints</h4>
@@ -2209,7 +2235,7 @@ function App() {
                         <div key={evaluation.id} className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl border border-gray-200 dark:border-gray-600 hover:shadow-md transition-shadow">
                             <div className="flex justify-between items-start mb-4">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-600 text-white flex items-center justify-center font-bold shadow-sm">
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-primary to-brand-primary/80 text-white flex items-center justify-center font-bold shadow-sm">
                                         {emp ? emp.username.substring(0, 2).toUpperCase() : '??'}
                                     </div>
                                     <div>
@@ -2219,7 +2245,7 @@ function App() {
                                 </div>
                                 <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                                     evaluation.status === 'Terminé' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' :
-                                    evaluation.status === 'En cours' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300' :
+                                    evaluation.status === 'En cours' ? 'bg-brand-bg text-brand-dark dark:bg-brand-dark dark:text-brand-primary/70' :
                                     'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
                                 }`}>
                                     {evaluation.status}
@@ -2240,7 +2266,7 @@ function App() {
                                             setNewGoalText('');
                                             setIsAddGoalModalOpen(true);
                                         }}
-                                        className="mt-2 text-xs text-indigo-600 hover:underline flex items-center gap-1"
+                                        className="mt-2 text-xs text-brand-primary hover:underline flex items-center gap-1"
                                     >
                                         + Ajouter un objectif
                                     </button>
@@ -2262,7 +2288,7 @@ function App() {
                                             setNewFeedbackText('');
                                             setIsAddFeedbackModalOpen(true);
                                         }}
-                                        className="mt-2 text-xs text-indigo-600 hover:underline flex items-center gap-1"
+                                        className="mt-2 text-xs text-brand-primary hover:underline flex items-center gap-1"
                                     >
                                         + Ajouter un feedback
                                     </button>
@@ -2288,8 +2314,8 @@ function App() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Communication Interne */}
               <div className="lg:col-span-2 space-y-6">
-                <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800">
-                  <h4 className="font-bold text-indigo-800 dark:text-indigo-300 mb-4 flex items-center gap-2">
+                <div className="bg-brand-bg/50 dark:bg-brand-dark/20 p-4 rounded-xl border border-brand-primary/20 dark:border-brand-dark">
+                  <h4 className="font-bold text-brand-dark dark:text-brand-primary/70 mb-4 flex items-center gap-2">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"></path></svg>
                     Communication Interne
                   </h4>
@@ -2302,11 +2328,11 @@ function App() {
                         </div>
                         <p className="text-gray-600 dark:text-gray-300 mb-3">{post.content}</p>
                         <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-gray-700 pt-2">
-                          <button className="flex items-center gap-1 hover:text-indigo-600 transition-colors">
+                          <button className="flex items-center gap-1 hover:text-brand-primary transition-colors">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
                             {post.likes} J'aime
                           </button>
-                          <button className="flex items-center gap-1 hover:text-indigo-600 transition-colors">
+                          <button className="flex items-center gap-1 hover:text-brand-primary transition-colors">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
                             {post.comments.length} Commentaires
                           </button>
@@ -2319,7 +2345,7 @@ function App() {
                         setNewPostContent('');
                         setIsNewPostModalOpen(true);
                     }}
-                    className="mt-4 w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 rounded-lg transition-colors font-medium"
+                    className="mt-4 w-full py-2 bg-brand-primary hover:bg-brand-primary/90 text-white shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 rounded-lg transition-colors font-medium"
                   >
                     Publier un message
                   </button>
@@ -2500,7 +2526,7 @@ function App() {
                                         <select 
                                             value={dCase.status}
                                             onChange={(e) => setDisciplinaryCases(disciplinaryCases.map(c => c.id === dCase.id ? { ...c, status: e.target.value } : c))}
-                                            className="text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                            className="text-sm border-gray-300 rounded-md shadow-sm focus:border-brand-primary/50 focus:ring focus:ring-brand-primary/20 focus:ring-opacity-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                                         >
                                             <option value="Nouveau">Nouveau</option>
                                             <option value="En cours">En cours</option>
@@ -2512,7 +2538,7 @@ function App() {
                                             dCase.status === 'Clôturé' ? 'bg-gray-100 text-gray-600' :
                                             dCase.status === 'Médiation' ? 'bg-purple-100 text-purple-800' :
                                             dCase.status === 'Sanctionné' ? 'bg-red-100 text-red-800' :
-                                            'bg-indigo-100 text-indigo-800'
+                                            'bg-brand-bg text-brand-dark'
                                         }`}>
                                             {dCase.status}
                                         </span>
@@ -2570,7 +2596,7 @@ function App() {
                                                     setCaseNote('');
                                                     setIsCaseNoteModalOpen(true);
                                                 }}
-                                                className="px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded text-xs font-medium border border-indigo-200 transition-colors flex items-center gap-1"
+                                                className="px-3 py-1.5 bg-brand-bg/50 text-brand-dark hover:bg-brand-bg rounded text-xs font-medium border border-brand-primary/30 transition-colors flex items-center gap-1"
                                             >
                                                 📝 Note Manager
                                             </button>
@@ -2596,46 +2622,46 @@ function App() {
                 <div className="space-y-6">
                     <div className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
                         <h4 className="font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-                            <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            <svg className="w-5 h-5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                             Modèles de Documents
                         </h4>
                         <div className="space-y-2">
                             <button className="w-full text-left px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:pl-8 transition-all duration-200 rounded transition-colors flex justify-between items-center group">
                                 <span>Protocole de médiation</span>
-                                <span className="text-gray-400 group-hover:text-indigo-500">↓</span>
+                                <span className="text-gray-400 group-hover:text-brand-primary">↓</span>
                             </button>
                             <button className="w-full text-left px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:pl-8 transition-all duration-200 rounded transition-colors flex justify-between items-center group">
                                 <span>Convocation entretien</span>
-                                <span className="text-gray-400 group-hover:text-indigo-500">↓</span>
+                                <span className="text-gray-400 group-hover:text-brand-primary">↓</span>
                             </button>
                             <button className="w-full text-left px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:pl-8 transition-all duration-200 rounded transition-colors flex justify-between items-center group">
                                 <span>Accord de confidentialité</span>
-                                <span className="text-gray-400 group-hover:text-indigo-500">↓</span>
+                                <span className="text-gray-400 group-hover:text-brand-primary">↓</span>
                             </button>
                             <button className="w-full text-left px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:pl-8 transition-all duration-200 rounded transition-colors flex justify-between items-center group">
                                 <span>Compte-rendu d'incident</span>
-                                <span className="text-gray-400 group-hover:text-indigo-500">↓</span>
+                                <span className="text-gray-400 group-hover:text-brand-primary">↓</span>
                             </button>
                         </div>
                     </div>
 
-                    <div className="bg-indigo-50 dark:bg-indigo-900/10 p-5 rounded-xl border border-indigo-100 dark:border-indigo-800">
-                        <h4 className="font-bold text-indigo-800 dark:text-indigo-300 mb-3 text-sm uppercase">Charte de Médiation</h4>
+                    <div className="bg-brand-bg/50 dark:bg-brand-dark/20 p-5 rounded-xl border border-brand-primary/20 dark:border-brand-dark">
+                        <h4 className="font-bold text-brand-dark dark:text-brand-primary/70 mb-3 text-sm uppercase">Charte de Médiation</h4>
                         <ul className="space-y-3">
-                            <li className="flex gap-3 text-sm text-indigo-900 dark:text-indigo-200">
-                                <span className="font-bold bg-indigo-200 dark:bg-indigo-800 w-6 h-6 flex items-center justify-center rounded-full text-xs shrink-0">1</span>
+                            <li className="flex gap-3 text-sm text-brand-dark dark:text-brand-primary/30">
+                                <span className="font-bold bg-brand-primary/20 dark:bg-brand-dark w-6 h-6 flex items-center justify-center rounded-full text-xs shrink-0">1</span>
                                 <span>Neutralité absolue du médiateur RH.</span>
                             </li>
-                            <li className="flex gap-3 text-sm text-indigo-900 dark:text-indigo-200">
-                                <span className="font-bold bg-indigo-200 dark:bg-indigo-800 w-6 h-6 flex items-center justify-center rounded-full text-xs shrink-0">2</span>
+                            <li className="flex gap-3 text-sm text-brand-dark dark:text-brand-primary/30">
+                                <span className="font-bold bg-brand-primary/20 dark:bg-brand-dark w-6 h-6 flex items-center justify-center rounded-full text-xs shrink-0">2</span>
                                 <span>Confidentialité des échanges garantie.</span>
                             </li>
-                            <li className="flex gap-3 text-sm text-indigo-900 dark:text-indigo-200">
-                                <span className="font-bold bg-indigo-200 dark:bg-indigo-800 w-6 h-6 flex items-center justify-center rounded-full text-xs shrink-0">3</span>
+                            <li className="flex gap-3 text-sm text-brand-dark dark:text-brand-primary/30">
+                                <span className="font-bold bg-brand-primary/20 dark:bg-brand-dark w-6 h-6 flex items-center justify-center rounded-full text-xs shrink-0">3</span>
                                 <span>Recherche de solutions amiables prioritaire.</span>
                             </li>
-                            <li className="flex gap-3 text-sm text-indigo-900 dark:text-indigo-200">
-                                <span className="font-bold bg-indigo-200 dark:bg-indigo-800 w-6 h-6 flex items-center justify-center rounded-full text-xs shrink-0">4</span>
+                            <li className="flex gap-3 text-sm text-brand-dark dark:text-brand-primary/30">
+                                <span className="font-bold bg-brand-primary/20 dark:bg-brand-dark w-6 h-6 flex items-center justify-center rounded-full text-xs shrink-0">4</span>
                                 <span>Formalisation écrite des accords trouvés.</span>
                             </li>
                         </ul>
@@ -2686,7 +2712,7 @@ function App() {
                         const now = new Date();
                         const time = `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
                         showNotification(`Pointage enregistré à ${time}`);
-                    }} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 rounded-lg transition-colors flex items-center gap-2 font-medium shadow-sm">
+                    }} className="px-4 py-2 bg-brand-primary hover:bg-brand-primary/90 text-white shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 rounded-lg transition-colors flex items-center gap-2 font-medium shadow-sm">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         Pointer (Web)
                     </button>
@@ -2712,9 +2738,9 @@ function App() {
                     <p className="text-xs text-red-600 dark:text-red-400 font-bold uppercase">Absents</p>
                     <p className="text-2xl font-bold text-red-800 dark:text-red-300">{employees.length - clockIns.length}</p>
                 </div>
-                <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800">
-                    <p className="text-xs text-indigo-600 dark:text-white font-bold uppercase">Heures Sup (Cumul)</p>
-                    <p className="text-2xl font-bold text-indigo-800 dark:text-indigo-300">12h30</p>
+                <div className="bg-brand-bg/50 dark:bg-brand-dark/20 p-4 rounded-xl border border-brand-primary/20 dark:border-brand-dark">
+                    <p className="text-xs text-brand-primary dark:text-white font-bold uppercase">Heures Sup (Cumul)</p>
+                    <p className="text-2xl font-bold text-brand-dark dark:text-brand-primary/70">12h30</p>
                 </div>
             </div>
 
@@ -2726,7 +2752,7 @@ function App() {
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
                             Pointages du {new Date().toLocaleDateString()}
                         </h4>
-                        <button onClick={() => showNotification("Données exportées vers le module Paie")} className="text-sm text-indigo-600 hover:underline font-medium flex items-center gap-1">
+                        <button onClick={() => showNotification("Données exportées vers le module Paie")} className="text-sm text-brand-primary hover:underline font-medium flex items-center gap-1">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                             Export Paie
                         </button>
@@ -2755,7 +2781,7 @@ function App() {
                                             <td className={`px-4 py-3 font-mono ${isLate ? 'text-red-600 font-bold' : ''}`}>{clock.in}</td>
                                             <td className="px-4 py-3 font-mono">{clock.out || '--:--'}</td>
                                             <td className="px-4 py-3">{calculateDuration(clock.in, clock.out)}</td>
-                                            <td className="px-4 py-3 text-indigo-600 font-bold">{calculateOvertime(clock.in, clock.out)}</td>
+                                            <td className="px-4 py-3 text-brand-primary font-bold">{calculateOvertime(clock.in, clock.out)}</td>
                                             <td className="px-4 py-3">
                                                 {isLate ? (
                                                     <span className="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-bold">Retard</span>
@@ -2776,7 +2802,7 @@ function App() {
                     <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
                         <div className="flex justify-between items-center mb-4">
                             <h4 className="font-bold text-gray-800 dark:text-white">Planning Équipes</h4>
-                            <button className="text-xs text-indigo-600 hover:underline">Gérer</button>
+                            <button className="text-xs text-brand-primary hover:underline">Gérer</button>
                         </div>
                         <div className="space-y-3">
                             {schedules.map(schedule => {
@@ -2810,15 +2836,15 @@ function App() {
         return (
           <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300 border border-gray-100 dark:border-gray-700 animate-fade-in">
             <div className="text-center mb-8">
-                <h3 className="text-3xl font-bold text-indigo-600 dark:text-white mb-2">Ben Yaacoub Company</h3>
+                <h3 className="text-3xl font-bold text-brand-primary dark:text-white mb-2">Ben Yaacoub Company</h3>
                 <p className="text-gray-600 dark:text-gray-300 italic">"Innover ensemble pour un avenir meilleur"</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 p-6 rounded-xl text-white shadow-lg transform hover:scale-105 transition-transform">
+                <div className="bg-gradient-to-br from-brand-primary to-brand-primary/80 p-6 rounded-xl text-white shadow-lg transform hover:scale-105 transition-transform">
                     <div className="text-4xl mb-4 opacity-80">🚀</div>
                     <h4 className="text-xl font-bold mb-2">Innovation</h4>
-                    <p className="text-indigo-100 text-sm">Nous repoussons sans cesse les limites de la technologie pour créer de la valeur.</p>
+                    <p className="text-white/80 text-sm">Nous repoussons sans cesse les limites de la technologie pour créer de la valeur.</p>
                 </div>
                 <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-6 rounded-xl text-white shadow-lg transform hover:scale-105 transition-transform">
                     <div className="text-4xl mb-4 opacity-80">🤝</div>
@@ -2836,14 +2862,14 @@ function App() {
                 <div className="lg:col-span-2 space-y-6">
                     <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
                         <h4 className="font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-                            <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"></path></svg>
+                            <svg className="w-5 h-5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"></path></svg>
                             Actualités & Annonces
                         </h4>
                         <div className="space-y-4">
                             {posts.filter(p => p.author === 'Direction' || p.author === "Comité d'entreprise").map(post => (
                                 <div key={post.id} className="flex gap-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-100 dark:border-gray-700">
                                     <div className="flex-shrink-0">
-                                        <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 rounded-full flex items-center justify-center font-bold text-xl">
+                                        <div className="w-12 h-12 bg-brand-bg dark:bg-brand-dark text-brand-primary dark:text-brand-primary/70 rounded-full flex items-center justify-center font-bold text-xl">
                                             📢
                                         </div>
                                     </div>
@@ -2890,24 +2916,24 @@ function App() {
                         </h4>
                         <div className="space-y-3">
                             {resources.map(resource => (
-                                <div key={resource.id} className="bg-white dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-600 flex items-center justify-between group cursor-pointer hover:border-indigo-400 transition-colors">
+                                <div key={resource.id} className="bg-white dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-600 flex items-center justify-between group cursor-pointer hover:border-brand-primary/50 transition-colors">
                                     <div className="flex items-center gap-3">
                                         <div className="w-8 h-8 bg-red-100 text-red-600 rounded flex items-center justify-center font-bold text-xs">
                                             {resource.type}
                                         </div>
                                         <div>
-                                            <p className="font-semibold text-gray-800 dark:text-white text-sm group-hover:text-indigo-600 transition-colors">{resource.title}</p>
+                                            <p className="font-semibold text-gray-800 dark:text-white text-sm group-hover:text-brand-primary transition-colors">{resource.title}</p>
                                             <p className="text-xs text-gray-500">{resource.size} • {new Date(resource.date).toLocaleDateString()}</p>
                                         </div>
                                     </div>
-                                    <svg className="w-4 h-4 text-gray-400 group-hover:text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                    <svg className="w-4 h-4 text-gray-400 group-hover:text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                                 </div>
                             ))}
                         </div>
-                        <div className="mt-6 p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-100 dark:border-indigo-800">
-                            <h5 className="font-bold text-indigo-800 dark:text-indigo-300 text-sm mb-2">Besoin d'aide ?</h5>
-                            <p className="text-xs text-indigo-600 dark:text-white mb-3">Contactez le support RH pour toute question administrative.</p>
-                            <button className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 text-xs font-bold rounded transition-colors">
+                        <div className="mt-6 p-4 bg-brand-bg/50 dark:bg-brand-dark/20 rounded-lg border border-brand-primary/20 dark:border-brand-dark">
+                            <h5 className="font-bold text-brand-dark dark:text-brand-primary/70 text-sm mb-2">Besoin d'aide ?</h5>
+                            <p className="text-xs text-brand-primary dark:text-white mb-3">Contactez le support RH pour toute question administrative.</p>
+                            <button className="w-full py-2 bg-brand-primary hover:bg-brand-primary/90 text-white shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 text-xs font-bold rounded transition-colors">
                                 Contacter RH
                             </button>
                         </div>
@@ -2936,9 +2962,21 @@ function App() {
                                     <p className="font-bold text-gray-800 dark:text-white text-sm">{benefit.name}</p>
                                     <p className="text-xs text-gray-500 dark:text-gray-400">Bénéficiaires: {benefit.beneficiaries}</p>
                                 </div>
-                                <div className="text-right">
-                                    <span className="font-bold text-green-600 dark:text-green-400 text-sm">{benefit.amount}</span>
-                                    <p className="text-xs text-gray-400">{benefit.type}</p>
+                                <div className="flex items-center gap-4">
+                                    <div className="text-right">
+                                        <span className="font-bold text-green-600 dark:text-green-400 text-sm">{benefit.amount}</span>
+                                        <p className="text-xs text-gray-400">{benefit.type}</p>
+                                    </div>
+                                    <button 
+                                        onClick={() => {
+                                            setEditingBenefit(benefit);
+                                            setIsEditBenefitModalOpen(true);
+                                        }}
+                                        className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
+                                        title="Éditer"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                                    </button>
                                 </div>
                             </div>
                         ))}
@@ -2955,8 +2993,8 @@ function App() {
                 </div>
 
                 {/* Comparaison Marché */}
-                <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800">
-                    <h4 className="font-bold text-indigo-800 dark:text-indigo-300 mb-4 flex items-center gap-2">
+                <div className="bg-brand-bg dark:bg-brand-dark/20 p-4 rounded-xl border border-brand-primary/20 dark:border-brand-dark">
+                    <h4 className="font-bold text-brand-primary dark:text-white mb-4 flex items-center gap-2">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
                         Comparaison Marché (Benchmark)
                     </h4>
@@ -2989,7 +3027,7 @@ function App() {
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
                         Grilles Salariales 2025
                     </h4>
-                    <button className="text-sm text-indigo-600 hover:underline">Mettre à jour</button>
+                    <button className="text-sm text-brand-primary hover:underline">Mettre à jour</button>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
@@ -3010,7 +3048,7 @@ function App() {
                                     <td className="px-4 py-3">{grid.max}</td>
                                     <td className="px-4 py-3">{grid.currency}</td>
                                     <td className="px-4 py-3">
-                                        <button className="text-indigo-600 hover:underline">Éditer</button>
+                                        <button className="text-brand-primary hover:underline">Éditer</button>
                                     </td>
                                 </tr>
                             ))}
@@ -3032,9 +3070,9 @@ function App() {
                     <p className="text-xs text-red-600 dark:text-red-400 font-bold uppercase">Accidents (Année)</p>
                     <p className="text-2xl font-bold text-red-800 dark:text-red-300">{accidents.length}</p>
                 </div>
-                <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800">
-                    <p className="text-xs text-indigo-600 dark:text-white font-bold uppercase">Visites Médicales</p>
-                    <p className="text-2xl font-bold text-indigo-800 dark:text-indigo-300">{medicalVisits.filter(v => v.status === 'Planifié').length} à venir</p>
+                <div className="bg-brand-bg dark:bg-brand-dark/20 p-4 rounded-xl border border-brand-primary/20 dark:border-brand-dark">
+                    <p className="text-xs text-brand-primary dark:text-white font-bold uppercase">Visites Médicales</p>
+                    <p className="text-2xl font-bold text-brand-primary dark:text-white">{medicalVisits.filter(v => v.status === 'Planifié').length} à venir</p>
                 </div>
                 <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-xl border border-yellow-100 dark:border-yellow-800">
                     <p className="text-xs text-yellow-600 dark:text-yellow-400 font-bold uppercase">Risques Identifiés</p>
@@ -3080,10 +3118,10 @@ function App() {
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
                     <div className="flex justify-between items-center mb-4">
                         <h4 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                            <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            <svg className="w-5 h-5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                             Suivi Médical
                         </h4>
-                        <button className="text-sm text-indigo-600 hover:underline">Planifier visite</button>
+                        <button className="text-sm text-brand-primary hover:underline">Planifier visite</button>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
@@ -3104,7 +3142,7 @@ function App() {
                                             <td className="px-4 py-2">{visit.type}</td>
                                             <td className="px-4 py-2">{new Date(visit.date).toLocaleDateString()}</td>
                                             <td className="px-4 py-2">
-                                                <span className={`px-2 py-1 rounded text-xs font-bold ${visit.status === 'Effectué' ? 'bg-green-100 text-green-800' : 'bg-indigo-100 text-indigo-800'}`}>
+                                                <span className={`px-2 py-1 rounded text-xs font-bold ${visit.status === 'Effectué' ? 'bg-green-100 text-green-800' : 'bg-brand-bg text-brand-primary'}`}>
                                                     {visit.status}
                                                 </span>
                                             </td>
@@ -3153,16 +3191,16 @@ function App() {
                                     <p className="font-bold text-gray-800 dark:text-white">{training.title}</p>
                                     <p className="text-xs text-gray-500">{new Date(training.date).toLocaleDateString()} • {Array.isArray(training.participants) ? `${training.participants.length} participants` : training.participants}</p>
                                 </div>
-                                <span className={`px-2 py-1 rounded text-xs font-bold ${training.status === 'Effectué' ? 'bg-green-100 text-green-800' : 'bg-indigo-100 text-indigo-800'}`}>
+                                <span className={`px-2 py-1 rounded text-xs font-bold ${training.status === 'Effectué' ? 'bg-green-100 text-green-800' : 'bg-brand-bg text-brand-primary'}`}>
                                     {training.status}
                                 </span>
                             </div>
                         ))}
                     </div>
-                    <div className="mt-4 p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded border border-indigo-100 dark:border-indigo-800">
-                        <h5 className="font-bold text-indigo-800 dark:text-indigo-300 text-sm mb-1">Documentation SST</h5>
-                        <p className="text-xs text-indigo-600 dark:text-white mb-2">Accédez aux procédures d'urgence et fiches de sécurité.</p>
-                        <button className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 px-3 py-1 rounded transition-colors">Voir Documents</button>
+                    <div className="mt-4 p-3 bg-brand-bg dark:bg-brand-dark/20 rounded border border-brand-primary/20 dark:border-brand-dark">
+                        <h5 className="font-bold text-brand-primary dark:text-white text-sm mb-1">Documentation SST</h5>
+                        <p className="text-xs text-brand-primary dark:text-white mb-2">Accédez aux procédures d'urgence et fiches de sécurité.</p>
+                        <button className="text-xs bg-brand-primary hover:bg-brand-secondary text-white shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 px-3 py-1 rounded transition-colors">Voir Documents</button>
                     </div>
                 </div>
             </div>
@@ -3181,10 +3219,10 @@ function App() {
                     <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border border-gray-200 dark:border-gray-600">
                         <div className="flex justify-between items-center mb-2">
                             <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Masse Salariale</span>
-                            <span className="text-xs font-bold text-indigo-600 bg-indigo-100 px-2 py-1 rounded">75%</span>
+                            <span className="text-xs font-bold text-brand-primary bg-brand-bg px-2 py-1 rounded">75%</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-600 mb-2">
-                            <div className="bg-indigo-600 h-2.5 rounded-full" style={{width: '75%'}}></div>
+                            <div className="bg-brand-primary h-2.5 rounded-full" style={{width: '75%'}}></div>
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400 flex justify-between">
                             <span>Utilisé: 750k DT</span>
@@ -3242,7 +3280,7 @@ function App() {
                     <div className="text-gray-500 dark:text-gray-400 text-xs uppercase font-bold mb-1">Satisfaction (eNPS)</div>
                     <div className="flex items-end gap-2">
                         <span className="text-3xl font-bold text-gray-800 dark:text-white">+42</span>
-                        <span className="text-indigo-500 text-sm font-medium mb-1">Stable</span>
+                        <span className="text-brand-primary text-sm font-medium mb-1">Stable</span>
                     </div>
                     <p className="text-xs text-gray-400 mt-2">Excellent &gt; 30</p>
                 </div>
@@ -3267,7 +3305,7 @@ function App() {
                                     <td className="px-4 py-3 font-medium text-gray-800 dark:text-white">Dev Senior</td>
                                     <td className="px-4 py-3 text-gray-500">Tech</td>
                                     <td className="px-4 py-3"><span className="text-red-600 font-bold text-xs">Haute</span></td>
-                                    <td className="px-4 py-3"><span className="bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded">En cours</span></td>
+                                    <td className="px-4 py-3"><span className="bg-brand-bg text-brand-primary text-xs px-2 py-1 rounded">En cours</span></td>
                                 </tr>
                                 <tr>
                                     <td className="px-4 py-3 font-medium text-gray-800 dark:text-white">Commercial</td>
@@ -3305,9 +3343,9 @@ function App() {
                         </button>
                     </div>
                     
-                    <div className="bg-indigo-50 dark:bg-indigo-900/20 p-5 rounded-xl border border-indigo-100 dark:border-indigo-800">
-                        <h5 className="font-bold text-indigo-800 dark:text-indigo-300 mb-2 text-sm">📈 Besoins Futurs en Compétences</h5>
-                        <ul className="space-y-2 text-sm text-indigo-900 dark:text-indigo-200">
+                    <div className="bg-brand-bg dark:bg-brand-dark/20 p-5 rounded-xl border border-brand-primary/20 dark:border-brand-dark">
+                        <h5 className="font-bold text-brand-primary dark:text-white mb-2 text-sm">📈 Besoins Futurs en Compétences</h5>
+                        <ul className="space-y-2 text-sm text-brand-primary dark:text-gray-300">
                             <li className="flex justify-between">
                                 <span>Intelligence Artificielle</span>
                                 <span className="font-bold">+15% demande</span>
@@ -3335,7 +3373,7 @@ function App() {
                     <h3 className="text-xl font-bold text-gray-800 dark:text-white">Marque Employeur & Communication</h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400">Rayonnement interne et externe de l'entreprise</p>
                 </div>
-                <button className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                <button className="bg-brand-primary hover:bg-brand-secondary text-white shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
                     + Nouvelle Publication
                 </button>
             </div>
@@ -3350,7 +3388,7 @@ function App() {
                         <div className="space-y-4">
                             <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-100 dark:border-gray-600 shadow-sm">
                                 <div className="flex justify-between items-start mb-2">
-                                    <span className="bg-indigo-100 text-indigo-800 text-xs font-bold px-2 py-1 rounded">Annonce</span>
+                                    <span className="bg-brand-bg text-brand-primary text-xs font-bold px-2 py-1 rounded">Annonce</span>
                                     <span className="text-xs text-gray-400">Il y a 2 heures</span>
                                 </div>
                                 <h5 className="font-bold text-gray-800 dark:text-white mb-1">Lancement du projet "Green Office" 🌿</h5>
@@ -3386,14 +3424,14 @@ function App() {
                         </h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                                <div className="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold">S</div>
+                                <div className="w-10 h-10 rounded-full bg-brand-primary flex items-center justify-center text-white font-bold">S</div>
                                 <div className="flex-1">
                                     <div className="flex justify-between mb-1">
                                         <span className="font-bold text-sm text-gray-800 dark:text-white">Sarah Ben Ali</span>
-                                        <span className="text-xs text-indigo-600">Semaine 1</span>
+                                        <span className="text-xs text-brand-primary">Semaine 1</span>
                                     </div>
                                     <div className="w-full bg-gray-200 rounded-full h-1.5 dark:bg-gray-600">
-                                        <div className="bg-indigo-500 h-1.5 rounded-full" style={{width: '25%'}}></div>
+                                        <div className="bg-brand-primary h-1.5 rounded-full" style={{width: '25%'}}></div>
                                     </div>
                                     <span className="text-xs text-gray-500 mt-1 block">Parcours d'intégration: 25%</span>
                                 </div>
@@ -3418,12 +3456,12 @@ function App() {
                 {/* Sidebar: Social & Events */}
                 <div className="space-y-6">
                     {/* Social Media Strategy */}
-                    <div className="bg-indigo-50 dark:bg-indigo-900/20 p-5 rounded-xl border border-indigo-100 dark:border-indigo-800">
-                        <h4 className="font-bold text-indigo-800 dark:text-indigo-300 mb-4 text-sm uppercase">Réseaux Sociaux</h4>
+                    <div className="bg-brand-bg dark:bg-brand-dark/20 p-5 rounded-xl border border-brand-primary/20 dark:border-brand-dark">
+                        <h4 className="font-bold text-brand-primary dark:text-white mb-4 text-sm uppercase">Réseaux Sociaux</h4>
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <span className="text-indigo-600 text-xl">in</span>
+                                    <span className="text-brand-primary text-xl">in</span>
                                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">LinkedIn</span>
                                 </div>
                                 <div className="text-right">
@@ -3433,7 +3471,7 @@ function App() {
                             </div>
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <span className="text-indigo-400 text-xl">fb</span>
+                                    <span className="text-brand-primary/70 text-xl">fb</span>
                                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Facebook</span>
                                 </div>
                                 <div className="text-right">
@@ -3441,9 +3479,9 @@ function App() {
                                     <div className="text-xs text-green-600">+45 abonnés</div>
                                 </div>
                             </div>
-                            <div className="pt-2 border-t border-indigo-200 dark:border-indigo-800">
-                                <p className="text-xs text-indigo-800 dark:text-indigo-300 mb-2 font-bold">Prochain Post:</p>
-                                <div className="bg-white dark:bg-gray-800 p-2 rounded text-xs text-gray-600 dark:text-gray-300 border border-indigo-100 dark:border-indigo-900">
+                            <div className="pt-2 border-t border-brand-primary/20 dark:border-brand-dark">
+                                <p className="text-xs text-brand-primary dark:text-white mb-2 font-bold">Prochain Post:</p>
+                                <div className="bg-white dark:bg-gray-800 p-2 rounded text-xs text-gray-600 dark:text-gray-300 border border-brand-primary/20 dark:border-brand-dark">
                                     "Retour en images sur notre Hackathon 2025 🚀"
                                     <br/>
                                     <span className="text-gray-400 italic">Prévu: Demain 10h</span>
@@ -3468,7 +3506,7 @@ function App() {
                                 </div>
                             </li>
                             <li className="flex gap-3">
-                                <div className="bg-indigo-100 text-indigo-800 rounded-lg w-12 h-12 flex flex-col items-center justify-center shrink-0">
+                                <div className="bg-brand-bg text-brand-primary rounded-lg w-12 h-12 flex flex-col items-center justify-center shrink-0">
                                     <span className="text-xs font-bold">JAN</span>
                                     <span className="text-lg font-bold leading-none">10</span>
                                 </div>
@@ -3478,7 +3516,7 @@ function App() {
                                 </div>
                             </li>
                         </ul>
-                        <button className="w-full mt-4 py-2 text-xs text-indigo-600 border border-indigo-200 rounded hover:bg-indigo-50 transition-colors">
+                        <button className="w-full mt-4 py-2 text-xs text-brand-primary border border-brand-primary/20 rounded hover:bg-brand-bg transition-colors">
                             Voir le calendrier complet
                         </button>
                     </div>
@@ -3547,14 +3585,14 @@ function App() {
                         <div className="text-sm text-orange-600 dark:text-orange-400 leading-tight">Dossiers actifs<br/>ce mois</div>
                     </div>
                 </div>
-                <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800">
-                    <h4 className="font-bold text-indigo-800 dark:text-indigo-300 mb-2">Matériel Récupéré</h4>
+                <div className="bg-brand-bg dark:bg-brand-dark/20 p-4 rounded-xl border border-brand-primary/20 dark:border-brand-dark">
+                    <h4 className="font-bold text-brand-primary dark:text-white mb-2">Matériel Récupéré</h4>
                     <div className="flex justify-between items-end mb-2">
-                        <span className="text-3xl font-bold text-indigo-600 dark:text-white">85%</span>
-                        <span className="text-sm text-indigo-600 dark:text-white mb-1">Sur les dossiers clos</span>
+                        <span className="text-3xl font-bold text-brand-primary dark:text-white">85%</span>
+                        <span className="text-sm text-brand-primary dark:text-white mb-1">Sur les dossiers clos</span>
                     </div>
-                    <div className="w-full bg-indigo-200 dark:bg-indigo-800 rounded-full h-2">
-                        <div className="bg-indigo-600 h-2 rounded-full" style={{ width: '85%' }}></div>
+                    <div className="w-full bg-brand-primary/20 dark:bg-brand-dark rounded-full h-2">
+                        <div className="bg-brand-primary h-2 rounded-full" style={{ width: '85%' }}></div>
                     </div>
                 </div>
                 <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-xl border border-gray-200 dark:border-gray-600">
@@ -3592,7 +3630,7 @@ function App() {
                         <div className="space-y-3">
                             <div className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700/50 rounded border border-gray-100 dark:border-gray-700">
                                 <div className="flex items-center gap-3">
-                                    <input type="checkbox" checked readOnly className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500" />
+                                    <input type="checkbox" checked readOnly className="w-4 h-4 text-brand-primary rounded border-gray-300 focus:ring-brand-primary" />
                                     <span className="text-sm text-gray-700 dark:text-gray-300 line-through opacity-70">Lettre de démission reçue</span>
                                 </div>
                                 <span className="text-xs text-green-600 font-bold">Fait</span>
@@ -3600,23 +3638,23 @@ function App() {
                             
                             <div className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700/50 rounded border border-gray-100 dark:border-gray-700">
                                 <div className="flex items-center gap-3">
-                                    <input type="checkbox" className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500" />
+                                    <input type="checkbox" className="w-4 h-4 text-brand-primary rounded border-gray-300 focus:ring-brand-primary" />
                                     <span className="text-sm text-gray-700 dark:text-gray-300">Récupération du matériel</span>
                                 </div>
-                                <button className="text-xs text-indigo-600 hover:underline">Checklist</button>
+                                <button className="text-xs text-brand-primary hover:underline">Checklist</button>
                             </div>
 
                             <div className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700/50 rounded border border-gray-100 dark:border-gray-700">
                                 <div className="flex items-center gap-3">
-                                    <input type="checkbox" className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500" />
+                                    <input type="checkbox" className="w-4 h-4 text-brand-primary rounded border-gray-300 focus:ring-brand-primary" />
                                     <span className="text-sm text-gray-700 dark:text-gray-300">Entretien de départ</span>
                                 </div>
-                                <button className="text-xs text-indigo-600 hover:underline">Planifier</button>
+                                <button className="text-xs text-brand-primary hover:underline">Planifier</button>
                             </div>
 
                             <div className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700/50 rounded border border-gray-100 dark:border-gray-700">
                                 <div className="flex items-center gap-3">
-                                    <input type="checkbox" className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500" />
+                                    <input type="checkbox" className="w-4 h-4 text-brand-primary rounded border-gray-300 focus:ring-brand-primary" />
                                     <span className="text-sm text-gray-700 dark:text-gray-300">Documents de sortie (STC, Attestation)</span>
                                 </div>
                                 <div className="flex gap-2">
@@ -3635,15 +3673,15 @@ function App() {
                         <div className="space-y-2">
                             <button className="w-full text-left px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:pl-8 transition-all duration-200 rounded transition-colors flex justify-between items-center group">
                                 <span>Attestation de travail</span>
-                                <span className="text-gray-400 group-hover:text-indigo-500">↓</span>
+                                <span className="text-gray-400 group-hover:text-brand-primary">↓</span>
                             </button>
                             <button className="w-full text-left px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:pl-8 transition-all duration-200 rounded transition-colors flex justify-between items-center group">
                                 <span>Reçu pour solde de tout compte</span>
-                                <span className="text-gray-400 group-hover:text-indigo-500">↓</span>
+                                <span className="text-gray-400 group-hover:text-brand-primary">↓</span>
                             </button>
                             <button className="w-full text-left px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:pl-8 transition-all duration-200 rounded transition-colors flex justify-between items-center group">
                                 <span>Checklist de sortie</span>
-                                <span className="text-gray-400 group-hover:text-indigo-500">↓</span>
+                                <span className="text-gray-400 group-hover:text-brand-primary">↓</span>
                             </button>
                         </div>
                     </div>
@@ -3669,7 +3707,7 @@ function App() {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="p-6 bg-gray-50 dark:bg-gray-700 rounded-xl border border-gray-200 dark:border-gray-600">
-                <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 rounded-lg flex items-center justify-center mb-4">
+                <div className="w-12 h-12 bg-brand-bg dark:bg-brand-dark text-brand-primary dark:text-white rounded-lg flex items-center justify-center mb-4">
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                 </div>
                 <h4 className="text-lg font-bold text-gray-800 dark:text-white mb-2">Rapport d'Absences</h4>
@@ -3720,7 +3758,7 @@ function App() {
                   {myPayslips.map(payslip => (
                     <div key={payslip.id} className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 hover:shadow-md transition-all">
                       <div className="flex items-center gap-3">
-                        <div className="p-2 bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 rounded-lg">
+                        <div className="p-2 bg-brand-bg dark:bg-brand-dark text-brand-primary dark:text-white rounded-lg">
                           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                         </div>
                         <div>
@@ -3728,7 +3766,7 @@ function App() {
                           <p className="text-xs text-gray-500 dark:text-gray-400">Fiche de paie</p>
                         </div>
                       </div>
-                      <button className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded transition-colors">
+                      <button className="px-3 py-1 bg-brand-primary hover:bg-brand-secondary text-white text-sm font-bold rounded transition-colors">
                         Télécharger
                       </button>
                     </div>
@@ -3768,7 +3806,7 @@ function App() {
               <h3 className="text-2xl font-bold text-gray-800 dark:text-white">Tickets & Demandes RH</h3>
               <button 
                 onClick={() => setIsNewIssueModalOpen(true)}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-lg hover:shadow-indigo-500/30 transition-all transform hover:-translate-y-0.5"
+                className="px-4 py-2 bg-brand-primary hover:bg-brand-secondary text-white font-bold rounded-lg shadow-lg hover:shadow-brand-primary/30 transition-all transform hover:-translate-y-0.5"
               >
                 + Nouveau Ticket
               </button>
@@ -3809,7 +3847,7 @@ function App() {
                 <h4 className="text-lg font-bold text-gray-800 dark:text-white mb-4">Aujourd'hui</h4>
                 <div className="flex items-center justify-center py-8">
                   <div className="text-center">
-                    <div className="text-4xl font-bold text-indigo-600 dark:text-indigo-400 mb-2">{todayClockIn?.in || '--:--'}</div>
+                    <div className="text-4xl font-bold text-brand-primary dark:text-brand-primary mb-2">{todayClockIn?.in || '--:--'}</div>
                     <p className="text-gray-500 dark:text-gray-400">Heure d'arrivée</p>
                   </div>
                   <div className="mx-8 text-gray-300 dark:text-gray-600 text-2xl">→</div>
@@ -3823,7 +3861,7 @@ function App() {
                     Badger Entrée
                   </button>
                 ) : !todayClockIn.out ? (
-                  <button onClick={handleClockOut} className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-lg transition-all">
+                  <button onClick={handleClockOut} className="w-full py-3 bg-brand-primary hover:bg-brand-secondary text-white font-bold rounded-lg shadow-lg transition-all">
                     Badger Sortie
                   </button>
                 ) : (
@@ -3871,7 +3909,7 @@ function App() {
                     <p className="text-gray-600 dark:text-gray-300 text-sm mb-1">Type: {training.type} • Durée: {training.duration}</p>
                     <p className="text-gray-500 dark:text-gray-400 text-xs">Date: {training.date}</p>
                   </div>
-                  <button onClick={() => { setSelectedTraining(training); setIsTrainingModalOpen(true); }} className="px-4 py-2 bg-indigo-100 dark:bg-indigo-900 hover:bg-indigo-200 dark:hover:bg-indigo-800 text-indigo-800 dark:text-indigo-200 rounded-lg transition-colors">
+                  <button onClick={() => { setSelectedTraining(training); setIsTrainingModalOpen(true); }} className="px-4 py-2 bg-brand-bg dark:bg-brand-dark hover:bg-brand-primary/20 dark:hover:bg-brand-dark/80 text-brand-primary dark:text-white rounded-lg transition-colors">
                     Détails
                   </button>
                 </div>
@@ -3910,7 +3948,7 @@ function App() {
                         <li key={idx}>{goal}</li>
                       ))}
                     </ul>
-                    <button onClick={() => { setSelectedEvaluation(evaluation); setIsEvaluationModalOpen(true); }} className="mt-3 text-sm text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium">Voir les détails &rarr;</button>
+                    <button onClick={() => { setSelectedEvaluation(evaluation); setIsEvaluationModalOpen(true); }} className="mt-3 text-sm text-brand-primary hover:text-brand-secondary dark:text-brand-primary dark:hover:text-white font-medium">Voir les détails &rarr;</button>
                   </div>
 
                   {evaluation.feedback.length > 0 && (
@@ -3936,7 +3974,7 @@ function App() {
               {posts.map(post => (
                 <div key={post.id} className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 hover:shadow-lg transition-all">
                   <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-bold">
+                    <div className="w-10 h-10 rounded-full bg-brand-bg dark:bg-brand-dark flex items-center justify-center text-brand-primary dark:text-white font-bold">
                       {post.author.charAt(0)}
                     </div>
                     <div>
@@ -3948,10 +3986,10 @@ function App() {
                     {post.content}
                   </p>
                   <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-gray-700 pt-4">
-                    <button onClick={() => handleLikePost(post.id)} className="flex items-center gap-1 hover:text-indigo-600 transition-colors">
+                    <button onClick={() => handleLikePost(post.id)} className="flex items-center gap-1 hover:text-brand-primary transition-colors">
                       <span>❤️</span> {post.likes} J'aime
                     </button>
-                    <button onClick={() => toggleComments(post.id)} className="flex items-center gap-1 hover:text-indigo-600 transition-colors">
+                    <button onClick={() => toggleComments(post.id)} className="flex items-center gap-1 hover:text-brand-primary transition-colors">
                       <span>💬</span> {post.comments.length} Commentaires
                     </button>
                   </div>
@@ -3964,7 +4002,7 @@ function App() {
                         ))}
                         <div className="flex gap-2 mt-2">
                           <input type="text" placeholder="Votre commentaire..." className="flex-1 text-sm p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-                          <button className="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700">Envoyer</button>
+                          <button className="px-3 py-1 bg-brand-primary text-white text-sm rounded hover:bg-brand-secondary">Envoyer</button>
                         </div>
                       </div>
                     </div>
@@ -3980,7 +4018,7 @@ function App() {
             <h3 className="text-2xl font-bold mb-4 text-gray-800 dark:text-white">Paramètres</h3>
             <div className="mb-4">
               <label className="flex items-center space-x-2 text-gray-700 dark:text-gray-300">
-                <input type="checkbox" defaultChecked className="form-checkbox h-5 w-5 text-indigo-600" /> 
+                <input type="checkbox" defaultChecked className="form-checkbox h-5 w-5 text-brand-primary" /> 
                 <span>Notifications Email</span>
               </label>
             </div>
@@ -3994,16 +4032,53 @@ function App() {
   };
 
   if (!user) {
+    return <Login onLogin={handleLogin} />;
+  }
+
+  const isAccountant = user && (user.username === 'comptable' || (user.post && user.post.toLowerCase().includes('comptable')));
+
+  if (isAccountant) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 transition-colors duration-300">
-        <header className="mb-8 text-center">
-          <h1 className="text-4xl font-bold text-indigo-600 dark:text-white animate-fade-in">Ben Yaacoub Company</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">Portail RH</p>
-        </header>
-        <main className="w-full max-w-md p-6 bg-white dark:bg-gray-800 rounded-xl shadow-xl animate-slide-up">
-          <Login onLogin={handleLogin} />
-        </main>
-      </div>
+      <AccountingPortal 
+        user={user} 
+        onLogout={handleLogout} 
+        darkMode={darkMode} 
+        toggleDarkMode={toggleDarkMode} 
+      />
+    );
+  }
+
+  if (!isHR) {
+    const resources = [
+      { id: 1, title: "Guide de l'employé", link: "#" },
+      { id: 2, title: "Politique de confidentialité", link: "#" },
+      { id: 3, title: "Charte informatique", link: "#" }
+    ];
+
+    return (
+      <EmployeePortal 
+        user={user}
+        onLogout={handleLogout}
+        darkMode={darkMode}
+        toggleDarkMode={toggleDarkMode}
+        leaveRequests={leaveRequests}
+        setLeaveRequests={setLeaveRequests}
+        myPayslips={myPayslips}
+        issues={issues}
+        setIssues={setIssues}
+        clockIns={clockIns}
+        setClockIns={setClockIns}
+        onClockIn={handleClockIn}
+        onClockOut={handleClockOut}
+        trainings={trainings}
+        setTrainings={setTrainings}
+        evaluations={evaluations}
+        posts={posts}
+        setPosts={setPosts}
+        notifications={notifications}
+        markAsSeen={markAsSeen}
+        resources={resources}
+      />
     );
   }
 
@@ -4011,28 +4086,28 @@ function App() {
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans transition-colors duration-300">
       <div className="flex h-screen overflow-hidden">
         <div className={`w-64 shadow-lg flex flex-col z-20 transition-colors duration-300 ${isHR ? 'bg-slate-900 text-white' : 'bg-white dark:bg-gray-800'}`}>
-          <div className={`p-6 text-xl font-bold border-b ${isHR ? 'text-white border-slate-700' : 'text-indigo-600 dark:text-white border-gray-200 dark:border-gray-700'}`}>
+          <div className={`p-6 text-xl font-bold border-b ${isHR ? 'text-white border-slate-700' : 'text-brand-primary dark:text-white border-gray-200 dark:border-gray-700'}`}>
             Ben Yaacoub Co.
           </div>
           <nav className="flex-1 overflow-y-auto py-4">
             <ul className="space-y-1">
               <li className={`px-6 py-3 cursor-pointer transition-colors ${
                 currentPage === 'dashboard' 
-                  ? (isHR ? 'bg-slate-800 text-white border-r-4 border-indigo-500' : 'bg-indigo-50 dark:bg-gray-700 border-r-4 border-indigo-500 text-indigo-600 dark:text-white') 
-                  : (isHR ? 'text-white hover:bg-slate-800 hover:text-gray-200' : 'text-gray-600 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 hover:pl-8 transition-all duration-200')
+                  ? (isHR ? 'bg-slate-800 text-white border-r-4 border-brand-primary' : 'bg-brand-bg dark:bg-gray-700 border-r-4 border-brand-primary text-brand-primary dark:text-white') 
+                  : (isHR ? 'text-white hover:bg-slate-800 hover:text-gray-200' : 'text-gray-600 dark:text-white hover:bg-brand-bg dark:hover:bg-gray-700 hover:pl-8 transition-all duration-200')
               }`} onClick={() => setCurrentPage('dashboard')}>Tableau de bord</li>
               
               {isHR ? (
                 <>
                   <li className={`px-6 py-3 cursor-pointer transition-colors ${
                     currentPage === 'employees' 
-                      ? 'bg-slate-800 text-white border-r-4 border-indigo-500' 
+                      ? 'bg-slate-800 text-white border-r-4 border-brand-primary' 
                       : 'text-white hover:bg-slate-800 hover:text-gray-200'
                   }`} onClick={() => setCurrentPage('employees')}>Gestion Employés</li>
                   
                   <li className={`px-6 py-3 cursor-pointer transition-colors flex justify-between items-center ${
                     currentPage === 'validations' 
-                      ? 'bg-slate-800 text-white border-r-4 border-indigo-500' 
+                      ? 'bg-slate-800 text-white border-r-4 border-brand-primary' 
                       : 'text-white hover:bg-slate-800 hover:text-gray-200'
                   }`} onClick={() => setCurrentPage('validations')}>
                     <span>Validations</span>
@@ -4043,79 +4118,79 @@ function App() {
                   
                   <li className={`px-6 py-3 cursor-pointer transition-colors ${
                     currentPage === 'recruitment' 
-                      ? 'bg-slate-800 text-white border-r-4 border-indigo-500' 
+                      ? 'bg-slate-800 text-white border-r-4 border-brand-primary' 
                       : 'text-white hover:bg-slate-800 hover:text-gray-200'
                   }`} onClick={() => setCurrentPage('recruitment')}>Recrutement</li>
 
                   <li className={`px-6 py-3 cursor-pointer transition-colors ${
                     currentPage === 'payroll' 
-                      ? 'bg-slate-800 text-white border-r-4 border-indigo-500' 
+                      ? 'bg-slate-800 text-white border-r-4 border-brand-primary' 
                       : 'text-white hover:bg-slate-800 hover:text-gray-200'
                   }`} onClick={() => setCurrentPage('payroll')}>Paie</li>
 
                   <li className={`px-6 py-3 cursor-pointer transition-colors ${
                     currentPage === 'compensation' 
-                      ? 'bg-slate-800 text-white border-r-4 border-indigo-500' 
+                      ? 'bg-slate-800 text-white border-r-4 border-brand-primary' 
                       : 'text-white hover:bg-slate-800 hover:text-gray-200'
                   }`} onClick={() => setCurrentPage('compensation')}>Compensations</li>
 
                   <li className={`px-6 py-3 cursor-pointer transition-colors ${
                     currentPage === 'attendance' 
-                      ? 'bg-slate-800 text-white border-r-4 border-indigo-500' 
+                      ? 'bg-slate-800 text-white border-r-4 border-brand-primary' 
                       : 'text-white hover:bg-slate-800 hover:text-gray-200'
                   }`} onClick={() => setCurrentPage('attendance')}>Présence</li>
 
                   <li className={`px-6 py-3 cursor-pointer transition-colors ${
                     currentPage === 'training' 
-                      ? 'bg-slate-800 text-white border-r-4 border-indigo-500' 
+                      ? 'bg-slate-800 text-white border-r-4 border-brand-primary' 
                       : 'text-white hover:bg-slate-800 hover:text-gray-200'
                   }`} onClick={() => setCurrentPage('training')}>Formation</li>
 
                   <li className={`px-6 py-3 cursor-pointer transition-colors ${
                     currentPage === 'performance' 
-                      ? 'bg-slate-800 text-white border-r-4 border-indigo-500' 
+                      ? 'bg-slate-800 text-white border-r-4 border-brand-primary' 
                       : 'text-white hover:bg-slate-800 hover:text-gray-200'
                   }`} onClick={() => setCurrentPage('performance')}>Performance</li>
 
                   <li className={`px-6 py-3 cursor-pointer transition-colors ${
                     currentPage === 'wellbeing' 
-                      ? 'bg-slate-800 text-white border-r-4 border-indigo-500' 
+                      ? 'bg-slate-800 text-white border-r-4 border-brand-primary' 
                       : 'text-white hover:bg-slate-800 hover:text-gray-200'
                   }`} onClick={() => setCurrentPage('wellbeing')}>Bien-être</li>
 
                   <li className={`px-6 py-3 cursor-pointer transition-colors ${
                     currentPage === 'discipline' 
-                      ? 'bg-slate-800 text-white border-r-4 border-indigo-500' 
+                      ? 'bg-slate-800 text-white border-r-4 border-brand-primary' 
                       : 'text-white hover:bg-slate-800 hover:text-gray-200'
                   }`} onClick={() => setCurrentPage('discipline')}>Discipline</li>
 
                   <li className={`px-6 py-3 cursor-pointer transition-colors ${
                     currentPage === 'sst' 
-                      ? 'bg-slate-800 text-white border-r-4 border-indigo-500' 
+                      ? 'bg-slate-800 text-white border-r-4 border-brand-primary' 
                       : 'text-white hover:bg-slate-800 hover:text-gray-200'
                   }`} onClick={() => setCurrentPage('sst')}>Santé & Sécurité</li>
 
                   <li className={`px-6 py-3 cursor-pointer transition-colors ${
                     currentPage === 'culture' 
-                      ? 'bg-slate-800 text-white border-r-4 border-indigo-500' 
+                      ? 'bg-slate-800 text-white border-r-4 border-brand-primary' 
                       : 'text-white hover:bg-slate-800 hover:text-gray-200'
                   }`} onClick={() => setCurrentPage('culture')}>Culture & Info</li>
 
                   <li className={`px-6 py-3 cursor-pointer transition-colors ${
                     currentPage === 'strategy' 
-                      ? 'bg-slate-800 text-white border-r-4 border-indigo-500' 
+                      ? 'bg-slate-800 text-white border-r-4 border-brand-primary' 
                       : 'text-white hover:bg-slate-800 hover:text-gray-200'
                   }`} onClick={() => setCurrentPage('strategy')}>Pilotage Stratégique</li>
 
                   <li className={`px-6 py-3 cursor-pointer transition-colors ${
                     currentPage === 'branding' 
-                      ? 'bg-slate-800 text-white border-r-4 border-indigo-500' 
+                      ? 'bg-slate-800 text-white border-r-4 border-brand-primary' 
                       : 'text-white hover:bg-slate-800 hover:text-gray-200'
                   }`} onClick={() => setCurrentPage('branding')}>Marque Employeur</li>
                   
                   <li className={`px-6 py-3 cursor-pointer transition-colors ${
                     currentPage === 'reports' 
-                      ? 'bg-slate-800 text-white border-r-4 border-indigo-500' 
+                      ? 'bg-slate-800 text-white border-r-4 border-brand-primary' 
                       : 'text-white hover:bg-slate-800 hover:text-gray-200'
                   }`} onClick={() => setCurrentPage('reports')}>Rapports</li>
                 </>
@@ -4123,14 +4198,14 @@ function App() {
                 <>
                   <li className={`px-6 py-3 cursor-pointer transition-colors ${
                     currentPage === 'profile' 
-                      ? 'bg-indigo-50 dark:bg-gray-700 border-r-4 border-indigo-500 text-indigo-600 dark:text-white' 
-                      : 'text-gray-600 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 hover:pl-8 transition-all duration-200'
+                      ? 'bg-brand-bg dark:bg-gray-700 border-r-4 border-brand-primary text-brand-primary dark:text-white' 
+                      : 'text-gray-600 dark:text-white hover:bg-brand-bg dark:hover:bg-gray-700 hover:pl-8 transition-all duration-200'
                   }`} onClick={() => setCurrentPage('profile')}>1. Profil salarié</li>
 
                   <li className={`px-6 py-3 cursor-pointer transition-colors flex justify-between items-center ${
                     currentPage === 'leave_requests' 
-                      ? 'bg-indigo-50 dark:bg-gray-700 border-r-4 border-indigo-500 text-indigo-600 dark:text-white' 
-                      : 'text-gray-600 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 hover:pl-8 transition-all duration-200'
+                      ? 'bg-brand-bg dark:bg-gray-700 border-r-4 border-brand-primary text-brand-primary dark:text-white' 
+                      : 'text-gray-600 dark:text-white hover:bg-brand-bg dark:hover:bg-gray-700 hover:pl-8 transition-all duration-200'
                   }`} onClick={() => { setCurrentPage('leave_requests'); markAsSeen('leave'); }}>
                     <span>2. Congés et absences</span>
                     {notifications.leave > 0 && <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">{notifications.leave}</span>}
@@ -4138,50 +4213,50 @@ function App() {
 
                   <li className={`px-6 py-3 cursor-pointer transition-colors ${
                     currentPage === 'documents' 
-                      ? 'bg-indigo-50 dark:bg-gray-700 border-r-4 border-indigo-500 text-indigo-600 dark:text-white' 
-                      : 'text-gray-600 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 hover:pl-8 transition-all duration-200'
+                      ? 'bg-brand-bg dark:bg-gray-700 border-r-4 border-brand-primary text-brand-primary dark:text-white' 
+                      : 'text-gray-600 dark:text-white hover:bg-brand-bg dark:hover:bg-gray-700 hover:pl-8 transition-all duration-200'
                   }`} onClick={() => setCurrentPage('documents')}>3. Mes documents</li>
 
                   <li className={`px-6 py-3 cursor-pointer transition-colors ${
                     currentPage === 'tickets' 
-                      ? 'bg-indigo-50 dark:bg-gray-700 border-r-4 border-indigo-500 text-indigo-600 dark:text-white' 
-                      : 'text-gray-600 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 hover:pl-8 transition-all duration-200'
+                      ? 'bg-brand-bg dark:bg-gray-700 border-r-4 border-brand-primary text-brand-primary dark:text-white' 
+                      : 'text-gray-600 dark:text-white hover:bg-brand-bg dark:hover:bg-gray-700 hover:pl-8 transition-all duration-200'
                   }`} onClick={() => setCurrentPage('tickets')}>4. Tickets & RH</li>
 
                   <li className={`px-6 py-3 cursor-pointer transition-colors ${
                     currentPage === 'attendance_emp' 
-                      ? 'bg-indigo-50 dark:bg-gray-700 border-r-4 border-indigo-500 text-indigo-600 dark:text-white' 
-                      : 'text-gray-600 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 hover:pl-8 transition-all duration-200'
+                      ? 'bg-brand-bg dark:bg-gray-700 border-r-4 border-brand-primary text-brand-primary dark:text-white' 
+                      : 'text-gray-600 dark:text-white hover:bg-brand-bg dark:hover:bg-gray-700 hover:pl-8 transition-all duration-200'
                   }`} onClick={() => setCurrentPage('attendance_emp')}>5. Pointage et heures</li>
 
                   <li className={`px-6 py-3 cursor-pointer transition-colors ${
                     currentPage === 'training_emp' 
-                      ? 'bg-indigo-50 dark:bg-gray-700 border-r-4 border-indigo-500 text-indigo-600 dark:text-white' 
-                      : 'text-gray-600 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 hover:pl-8 transition-all duration-200'
+                      ? 'bg-brand-bg dark:bg-gray-700 border-r-4 border-brand-primary text-brand-primary dark:text-white' 
+                      : 'text-gray-600 dark:text-white hover:bg-brand-bg dark:hover:bg-gray-700 hover:pl-8 transition-all duration-200'
                   }`} onClick={() => setCurrentPage('training_emp')}>6. Formation</li>
 
                   <li className={`px-6 py-3 cursor-pointer transition-colors ${
                     currentPage === 'goals' 
-                      ? 'bg-indigo-50 dark:bg-gray-700 border-r-4 border-indigo-500 text-indigo-600 dark:text-white' 
-                      : 'text-gray-600 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 hover:pl-8 transition-all duration-200'
+                      ? 'bg-brand-bg dark:bg-gray-700 border-r-4 border-brand-primary text-brand-primary dark:text-white' 
+                      : 'text-gray-600 dark:text-white hover:bg-brand-bg dark:hover:bg-gray-700 hover:pl-8 transition-all duration-200'
                   }`} onClick={() => setCurrentPage('goals')}>7. Objectifs personnels</li>
 
                   <li className={`px-6 py-3 cursor-pointer transition-colors ${
                     currentPage === 'news' 
-                      ? 'bg-indigo-50 dark:bg-gray-700 border-r-4 border-indigo-500 text-indigo-600 dark:text-white' 
-                      : 'text-gray-600 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 hover:pl-8 transition-all duration-200'
+                      ? 'bg-brand-bg dark:bg-gray-700 border-r-4 border-brand-primary text-brand-primary dark:text-white' 
+                      : 'text-gray-600 dark:text-white hover:bg-brand-bg dark:hover:bg-gray-700 hover:pl-8 transition-all duration-200'
                   }`} onClick={() => setCurrentPage('news')}>8. Actualités</li>
 
                   <li className={`px-6 py-3 cursor-pointer transition-colors ${
                     isChatOpen 
-                      ? 'bg-indigo-50 dark:bg-gray-700 border-r-4 border-indigo-500 text-indigo-600 dark:text-white' 
-                      : 'text-gray-600 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 hover:pl-8 transition-all duration-200'
+                      ? 'bg-brand-bg dark:bg-gray-700 border-r-4 border-brand-primary text-brand-primary dark:text-white' 
+                      : 'text-gray-600 dark:text-white hover:bg-brand-bg dark:hover:bg-gray-700 hover:pl-8 transition-all duration-200'
                   }`} onClick={() => setIsChatOpen(true)}>9. Chat RH</li>
                 </>
               )}
               <li className={`px-6 py-3 cursor-pointer transition-colors ${
                 currentPage === 'settings' 
-                  ? (isHR ? 'bg-slate-800 text-white border-r-4 border-indigo-500' : 'bg-indigo-50 dark:bg-gray-700 border-r-4 border-indigo-500 text-indigo-600 dark:text-white') 
+                  ? (isHR ? 'bg-slate-800 text-white border-r-4 border-brand-primary' : 'bg-brand-bg dark:bg-gray-700 border-r-4 border-brand-primary text-brand-primary dark:text-white') 
                   : (isHR ? 'text-white hover:bg-slate-800 hover:text-gray-200' : 'text-gray-600 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 hover:pl-8 transition-all duration-200')
               }`} onClick={() => setCurrentPage('settings')}>Paramètres</li>
             </ul>
@@ -4218,7 +4293,7 @@ function App() {
           <ChatWindow user={user} onClose={() => setIsChatOpen(false)} />
         </div>
       ) : (
-        <button className="fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-indigo-700 transition-transform hover:scale-110 z-50" onClick={() => setIsChatOpen(true)}>
+        <button className="fixed bottom-6 right-6 w-14 h-14 bg-brand-primary text-white rounded-full shadow-lg flex items-center justify-center hover:bg-brand-secondary transition-transform hover:scale-110 z-50" onClick={() => setIsChatOpen(true)}>
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
           </svg>
@@ -4256,7 +4331,7 @@ function App() {
                 setSelectedEmployee({ ...editingEmployee, role: editEmployeeRole, department: editEmployeeDept });
                 showNotification("Employé mis à jour");
                 setIsEditEmployeeModalOpen(false);
-              }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Sauvegarder</button>
+              }} className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Sauvegarder</button>
             </div>
           </div>
         </div>
@@ -4295,7 +4370,7 @@ function App() {
                   setIsAddDocModalOpen(false);
                   setNewDocName('');
                 }
-              }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Ajouter</button>
+              }} className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Ajouter</button>
             </div>
           </div>
         </div>
@@ -4305,12 +4380,12 @@ function App() {
       {isDownloadModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 animate-fade-in p-4">
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
-            <div className="w-16 h-16 bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 bg-brand-bg dark:bg-brand-dark text-brand-primary dark:text-brand-primary/80 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
             </div>
             <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-2">Télécharger</h3>
             <p className="text-gray-600 dark:text-gray-300 mb-6">Téléchargement de <strong>{downloadDocName}</strong>...</p>
-            <button onClick={() => setIsDownloadModalOpen(false)} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">OK</button>
+            <button onClick={() => setIsDownloadModalOpen(false)} className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">OK</button>
           </div>
         </div>
       )}
@@ -4360,7 +4435,7 @@ function App() {
                   setIsTrainingNeedModalOpen(false);
                   setNewTrainingNeed('');
                 }
-              }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Ajouter</button>
+              }} className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Ajouter</button>
             </div>
           </div>
         </div>
@@ -4390,7 +4465,7 @@ function App() {
                   setIsNewTrainingModalOpen(false);
                   setNewTrainingTitle('');
                 }
-              }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Créer</button>
+              }} className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Créer</button>
             </div>
           </div>
         </div>
@@ -4414,7 +4489,7 @@ function App() {
                 } else {
                   showNotification("Employé introuvable");
                 }
-              }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Ajouter</button>
+              }} className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Ajouter</button>
             </div>
           </div>
         </div>
@@ -4435,7 +4510,7 @@ function App() {
                   setIsAddGoalModalOpen(false);
                   setNewGoalText('');
                 }
-              }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Ajouter</button>
+              }} className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Ajouter</button>
             </div>
           </div>
         </div>
@@ -4456,7 +4531,7 @@ function App() {
                   setIsAddFeedbackModalOpen(false);
                   setNewFeedbackText('');
                 }
-              }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Ajouter</button>
+              }} className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Ajouter</button>
             </div>
           </div>
         </div>
@@ -4485,7 +4560,7 @@ function App() {
                   setIsNewPostModalOpen(false);
                   setNewPostContent('');
                 }
-              }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Publier</button>
+              }} className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Publier</button>
             </div>
           </div>
         </div>
@@ -4593,7 +4668,7 @@ function App() {
                   setIsMediationModalOpen(false);
                   setMediationDate('');
                 }
-              }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Planifier</button>
+              }} className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Planifier</button>
             </div>
           </div>
         </div>
@@ -4615,7 +4690,7 @@ function App() {
                   setIsCaseNoteModalOpen(false);
                   setCaseNote('');
                 }
-              }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Ajouter</button>
+              }} className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Ajouter</button>
             </div>
           </div>
         </div>
@@ -4659,7 +4734,69 @@ function App() {
                   setIsNewBenefitModalOpen(false);
                   setNewBenefitName('');
                 }
-              }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Ajouter</button>
+              }} className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Ajouter</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Benefit Modal */}
+      {isEditBenefitModalOpen && editingBenefit && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 animate-fade-in p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Modifier l'Avantage</h3>
+            
+            <div className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nom</label>
+                    <input 
+                        type="text" 
+                        value={editingBenefit.name} 
+                        onChange={(e) => setEditingBenefit({...editingBenefit, name: e.target.value})} 
+                        className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
+                    />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Montant / Valeur</label>
+                    <input 
+                        type="text" 
+                        value={editingBenefit.amount} 
+                        onChange={(e) => setEditingBenefit({...editingBenefit, amount: e.target.value})} 
+                        className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
+                    />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
+                    <select 
+                        value={editingBenefit.type} 
+                        onChange={(e) => setEditingBenefit({...editingBenefit, type: e.target.value})} 
+                        className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    >
+                        <option value="Repas">Repas</option>
+                        <option value="Santé">Santé</option>
+                        <option value="Transport">Transport</option>
+                        <option value="Prime">Prime</option>
+                        <option value="Autre">Autre</option>
+                    </select>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Bénéficiaires</label>
+                    <input 
+                        type="text" 
+                        value={editingBenefit.beneficiaries} 
+                        onChange={(e) => setEditingBenefit({...editingBenefit, beneficiaries: e.target.value})} 
+                        className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
+                    />
+                </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={() => setIsEditBenefitModalOpen(false)} className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">Annuler</button>
+              <button onClick={() => {
+                setBenefits(benefits.map(b => b.id === editingBenefit.id ? editingBenefit : b));
+                showNotification("Avantage mis à jour");
+                setIsEditBenefitModalOpen(false);
+              }} className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Enregistrer</button>
             </div>
           </div>
         </div>
@@ -4689,7 +4826,7 @@ function App() {
       {isReportModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 animate-fade-in p-4">
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 text-center">
-            <div className="w-16 h-16 bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 bg-brand-bg dark:bg-brand-dark text-brand-primary dark:text-brand-primary/80 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
             </div>
             <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-2">Génération de Rapport</h3>
@@ -4701,7 +4838,7 @@ function App() {
               <button onClick={() => {
                 showNotification(`Rapport ${reportType === 'absences' ? "d'absences" : reportType === 'payroll' ? "de paie" : "d'analyse"} généré avec succès`);
                 setIsReportModalOpen(false);
-              }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Télécharger</button>
+              }} className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Télécharger</button>
             </div>
           </div>
         </div>
@@ -4717,8 +4854,8 @@ function App() {
               <p className="text-gray-600 dark:text-gray-300"><strong>Durée:</strong> {selectedTraining.duration}</p>
               <p className="text-gray-600 dark:text-gray-300"><strong>Date:</strong> {selectedTraining.date}</p>
               <p className="text-gray-600 dark:text-gray-300"><strong>Statut:</strong> {selectedTraining.status}</p>
-              <div className="bg-indigo-50 dark:bg-indigo-900/20 p-3 rounded-lg border border-indigo-100 dark:border-indigo-800">
-                <p className="text-sm text-indigo-800 dark:text-indigo-300">
+              <div className="bg-brand-bg dark:bg-brand-dark/20 p-3 rounded-lg border border-brand-bg dark:border-brand-dark">
+                <p className="text-sm text-brand-primary dark:text-brand-primary/80">
                   Cette formation est {selectedTraining.type.toLowerCase()}. Assurez-vous de compléter les modules pré-requis avant la date de début.
                 </p>
               </div>
