@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { jsPDF } from "jspdf";
+import { GraduationCap, Shield, Leaf, Calendar, FileText, Gavel } from 'lucide-react';
 import ChatWindow from './components/ChatWindow';
 import Login from './components/Login';
 import EmployeePortal from './components/EmployeePortal';
 import AccountingPortal from './components/AccountingPortal';
+import CorporateWebsite from './components/CorporateWebsite';
 import './App.css';
 
 function App() {
+  const [showWebsite, setShowWebsite] = useState(true);
   const [user, setUser] = useState(() => {
     const savedUser = localStorage.getItem('user');
     return savedUser ? JSON.parse(savedUser) : null;
@@ -60,7 +63,7 @@ function App() {
     { id: 3, employeeId: 3, date: "2025-12-02", in: "08:45", out: "17:30", status: "Présent" },
     { id: 4, employeeId: 4, date: "2025-12-02", in: "09:00", out: "17:00", status: "Présent" }
   ]);
-  const [schedules] = useState([
+  const [schedules, setSchedules] = useState([
     { id: 1, employeeId: 1, week: "2025-W49", monday: "09:00-18:00", tuesday: "09:00-18:00", wednesday: "09:00-18:00", thursday: "09:00-18:00", friday: "09:00-17:00" },
     { id: 2, employeeId: 2, week: "2025-W49", monday: "09:30-18:30", tuesday: "09:30-18:30", wednesday: "Remote", thursday: "09:30-18:30", friday: "09:30-17:30" }
   ]);
@@ -69,6 +72,7 @@ function App() {
     { id: 2, title: "Team Building Cuisine", date: "2026-02-20", type: "Activité", location: "Atelier des Chefs" },
     { id: 3, title: "Hackathon Interne", date: "2026-03-10", type: "Innovation", location: "Campus Tech" }
   ]);
+
   const [resources] = useState([
     { id: 1, title: "Livret d'accueil", type: "PDF", size: "2.5 MB", date: "2025-01-01" },
     { id: 2, title: "Règlement Intérieur", type: "PDF", size: "1.2 MB", date: "2024-06-15" },
@@ -80,7 +84,7 @@ function App() {
     { id: 2, name: "Assurance Santé", amount: "100% Prise en charge", type: "Santé", beneficiaries: "Tous" },
     { id: 3, name: "Prime Transport", amount: "50 DT / mois", type: "Transport", beneficiaries: "Tous" }
   ]);
-  const [salaryGrids] = useState([
+  const [salaryGrids, setSalaryGrids] = useState([
     { id: 1, role: "Junior", min: 2500, max: 3500, currency: "DT" },
     { id: 2, role: "Confirmé", min: 3500, max: 5000, currency: "DT" },
     { id: 3, role: "Senior", min: 5000, max: 7500, currency: "DT" },
@@ -173,19 +177,36 @@ function App() {
 
   // Modal States for Training
   const [isTrainingNeedModalOpen, setIsTrainingNeedModalOpen] = useState(false);
-  const [newTrainingNeed, setNewTrainingNeed] = useState('');
+  const [newTrainingNeed, setNewTrainingNeed] = useState({ description: '', priority: 'Moyenne', department: '' });
 
   const [isNewTrainingModalOpen, setIsNewTrainingModalOpen] = useState(false);
-  const [newTrainingTitle, setNewTrainingTitle] = useState('');
+  const [newTraining, setNewTraining] = useState({ title: '', type: 'Interne', duration: '', date: '', participants: [] });
+
+  const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState(null);
+  const [isMatrixModalOpen, setIsMatrixModalOpen] = useState(false);
+
+  const [certifications, setCertifications] = useState([
+    { id: 1, name: "Expert Java", color: "yellow" },
+    { id: 2, name: "Scrum Master", color: "brand" },
+    { id: 3, name: "Secouriste", color: "red" }
+  ]);
+  const [isCertificationModalOpen, setIsCertificationModalOpen] = useState(false);
+  const [newCertificationName, setNewCertificationName] = useState('');
+  const [newCertificationColor, setNewCertificationColor] = useState('gray');
 
   const [isAddParticipantModalOpen, setIsAddParticipantModalOpen] = useState(false);
   const [trainingToAddTo, setTrainingToAddTo] = useState(null);
   const [participantIdToAdd, setParticipantIdToAdd] = useState('');
+  const [participantSearchQuery, setParticipantSearchQuery] = useState('');
 
   // Modal States for Performance
+  const [isNewEvaluationModalOpen, setIsNewEvaluationModalOpen] = useState(false);
+  const [newEvaluation, setNewEvaluation] = useState({ employeeId: '', type: 'Annuel', year: new Date().getFullYear(), date: '', goals: [] });
   const [isAddGoalModalOpen, setIsAddGoalModalOpen] = useState(false);
   const [evalForGoal, setEvalForGoal] = useState(null);
   const [newGoalText, setNewGoalText] = useState('');
+  const [newGoalType, setNewGoalType] = useState('Technique');
 
   const [isAddFeedbackModalOpen, setIsAddFeedbackModalOpen] = useState(false);
   const [evalForFeedback, setEvalForFeedback] = useState(null);
@@ -194,6 +215,7 @@ function App() {
   // Modal States for Communication
   const [isNewPostModalOpen, setIsNewPostModalOpen] = useState(false);
   const [newPostContent, setNewPostContent] = useState('');
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
 
   // Modal States for Issues
   const [isNewIssueModalOpen, setIsNewIssueModalOpen] = useState(false);
@@ -202,6 +224,17 @@ function App() {
 
   // Modal States for Disciplinary
   const [isNewCaseModalOpen, setIsNewCaseModalOpen] = useState(false);
+
+  // Modal States for SST
+  const [isNewAccidentModalOpen, setIsNewAccidentModalOpen] = useState(false);
+  const [newAccident, setNewAccident] = useState({ employeeId: '', date: '', type: 'Chute', description: '', severity: 'Faible' });
+
+  const [isNewMedicalVisitModalOpen, setIsNewMedicalVisitModalOpen] = useState(false);
+  const [newMedicalVisit, setNewMedicalVisit] = useState({ employeeId: '', date: '', type: 'Visite périodique' });
+
+  const [isNewSafetyTrainingModalOpen, setIsNewSafetyTrainingModalOpen] = useState(false);
+  const [newSafetyTraining, setNewSafetyTraining] = useState({ title: '', date: '', participants: [] });
+
   // Employee View States
   const [selectedTraining, setSelectedTraining] = useState(null);
   const [isTrainingModalOpen, setIsTrainingModalOpen] = useState(false);
@@ -230,6 +263,16 @@ function App() {
   const [newBenefitName, setNewBenefitName] = useState('');
   const [isEditBenefitModalOpen, setIsEditBenefitModalOpen] = useState(false);
   const [editingBenefit, setEditingBenefit] = useState(null);
+
+  // Modal States for Salary Grids
+  const [isSalaryGridModalOpen, setIsSalaryGridModalOpen] = useState(false);
+  const [editingSalaryGrid, setEditingSalaryGrid] = useState(null);
+  const [newSalaryGrid, setNewSalaryGrid] = useState({ role: '', min: '', max: '', currency: 'DT' });
+
+  // Modal States for Schedules
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState(null);
+  const [newSchedule, setNewSchedule] = useState({ employeeId: '', week: '', monday: '', tuesday: '', wednesday: '', thursday: '', friday: '' });
 
   // Modal States for Offboarding
   const [isOffboardingModalOpen, setIsOffboardingModalOpen] = useState(false);
@@ -1993,7 +2036,7 @@ function App() {
                 <div className="flex gap-2">
                     <button 
                         onClick={() => {
-                            setNewTrainingNeed('');
+                            setNewTrainingNeed({ description: '', priority: 'Moyenne', department: '' });
                             setIsTrainingNeedModalOpen(true);
                         }}
                         className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors shadow-sm text-sm font-medium"
@@ -2002,7 +2045,7 @@ function App() {
                     </button>
                     <button 
                         onClick={() => {
-                            setNewTrainingTitle('');
+                            setNewTraining({ title: '', type: 'Interne', duration: '', date: '', participants: [] });
                             setIsNewTrainingModalOpen(true);
                         }}
                         className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-dark shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 transition-colors shadow-sm flex items-center gap-2 text-sm font-medium"
@@ -2148,7 +2191,10 @@ function App() {
                                 </div>
                             </div>
                         </div>
-                        <button className="w-full mt-4 py-2 text-xs text-gray-600 border border-gray-200 rounded hover:bg-gray-50 transition-colors">
+                        <button 
+                            onClick={() => setIsMatrixModalOpen(true)}
+                            className="w-full mt-4 py-2 text-xs text-gray-600 border border-gray-200 rounded hover:bg-gray-50 transition-colors"
+                        >
                             Voir la matrice complète
                         </button>
                     </div>
@@ -2156,25 +2202,32 @@ function App() {
                     {/* E-Learning Platform */}
                     <div className="bg-brand-bg/50 dark:bg-brand-dark/20 p-5 rounded-xl border border-brand-primary/20 dark:border-brand-dark">
                         <h4 className="font-bold text-brand-dark dark:text-brand-primary/70 mb-4 text-sm uppercase flex items-center gap-2">
-                            <span>🎓</span> Plateforme E-Learning
+                            <GraduationCap className="w-5 h-5" /> Plateforme E-Learning
                         </h4>
                         <div className="space-y-3">
                             <div className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-brand-primary/20 dark:border-brand-dark flex gap-3">
-                                <div className="w-10 h-10 bg-brand-bg rounded flex items-center justify-center text-lg">🔒</div>
+                                <div className="w-10 h-10 bg-brand-bg rounded flex items-center justify-center text-brand-primary">
+                                    <Shield className="w-5 h-5" />
+                                </div>
                                 <div>
                                     <h5 className="font-bold text-xs text-gray-800 dark:text-white">Cybersécurité Avancée</h5>
                                     <p className="text-xs text-gray-500">2h 30m • En cours</p>
                                 </div>
                             </div>
                             <div className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-brand-primary/20 dark:border-brand-dark flex gap-3">
-                                <div className="w-10 h-10 bg-green-100 rounded flex items-center justify-center text-lg">🌱</div>
+                                <div className="w-10 h-10 bg-green-100 rounded flex items-center justify-center text-green-600">
+                                    <Leaf className="w-5 h-5" />
+                                </div>
                                 <div>
                                     <h5 className="font-bold text-xs text-gray-800 dark:text-white">RSE & Impact</h5>
                                     <p className="text-xs text-gray-500">1h 15m • Nouveau</p>
                                 </div>
                             </div>
                         </div>
-                        <button className="w-full mt-3 py-1.5 bg-brand-primary text-white text-xs rounded hover:bg-brand-primary/90 transition-colors">
+                        <button 
+                            onClick={() => setIsCatalogModalOpen(true)}
+                            className="w-full mt-3 py-1.5 bg-brand-primary text-white text-xs rounded hover:bg-brand-primary/90 transition-colors"
+                        >
                             Accéder au catalogue
                         </button>
                     </div>
@@ -2183,10 +2236,24 @@ function App() {
                     <div className="bg-white dark:bg-gray-800 p-5 rounded-xl border border-gray-200 dark:border-gray-600 shadow-sm">
                         <h4 className="font-bold text-gray-800 dark:text-white mb-4 text-sm uppercase">Certifications Internes</h4>
                         <div className="flex flex-wrap gap-2">
-                            <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-bold rounded border border-yellow-200">Expert Java</span>
-                            <span className="px-2 py-1 bg-brand-bg text-brand-dark text-xs font-bold rounded border border-brand-primary/30">Scrum Master</span>
-                            <span className="px-2 py-1 bg-red-100 text-red-800 text-xs font-bold rounded border border-red-200">Secouriste</span>
-                            <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-bold rounded border border-gray-200">+ Ajouter</span>
+                            {certifications.map(cert => (
+                                <span key={cert.id} className={`px-2 py-1 text-xs font-bold rounded border ${
+                                    cert.color === 'yellow' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
+                                    cert.color === 'brand' ? 'bg-brand-bg text-brand-dark border-brand-primary/30' :
+                                    cert.color === 'red' ? 'bg-red-100 text-red-800 border-red-200' :
+                                    cert.color === 'green' ? 'bg-green-100 text-green-800 border-green-200' :
+                                    cert.color === 'blue' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                                    'bg-gray-100 text-gray-600 border-gray-200'
+                                }`}>
+                                    {cert.name}
+                                </span>
+                            ))}
+                            <button 
+                                onClick={() => setIsCertificationModalOpen(true)}
+                                className="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-bold rounded border border-gray-200 hover:bg-gray-200 transition-colors"
+                            >
+                                + Ajouter
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -2199,7 +2266,10 @@ function App() {
           <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300 border border-gray-100 dark:border-gray-700 animate-fade-in">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold text-gray-800 dark:text-white">Performance & Évaluation</h3>
-              <button className="bg-brand-primary hover:bg-brand-primary/90 text-white shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm">
+              <button 
+                onClick={() => setIsNewEvaluationModalOpen(true)}
+                className="bg-brand-primary hover:bg-brand-primary/90 text-white shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+              >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
                 Nouvelle Évaluation
               </button>
@@ -2295,9 +2365,22 @@ function App() {
                                 </div>
                             </div>
 
-                            <div className="flex justify-end items-center gap-3 border-t border-gray-100 dark:border-gray-600 pt-3">
-                                <span className="text-xs text-gray-500 dark:text-gray-400">Évaluateur: {evaluation.reviewer}</span>
-                                <span className="text-xs text-gray-500 dark:text-gray-400">Date: {new Date(evaluation.date).toLocaleDateString()}</span>
+                            <div className="flex justify-between items-center border-t border-gray-100 dark:border-gray-600 pt-3 mt-3">
+                                {evaluation.status !== 'Terminé' && (
+                                    <button 
+                                        onClick={() => {
+                                            setEvaluations(evaluations.map(ev => ev.id === evaluation.id ? { ...ev, status: 'Terminé' } : ev));
+                                            showNotification("Évaluation terminée");
+                                        }}
+                                        className="px-3 py-1 bg-green-600 text-white text-xs font-bold rounded hover:bg-green-700 transition-colors"
+                                    >
+                                        Terminer
+                                    </button>
+                                )}
+                                <div className="flex gap-3 ml-auto">
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">Évaluateur: {evaluation.reviewer}</span>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">Date: {new Date(evaluation.date).toLocaleDateString()}</span>
+                                </div>
                             </div>
                         </div>
                     );
@@ -2442,7 +2525,12 @@ function App() {
                     <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
                         <h5 className="font-bold text-gray-800 dark:text-white">Yoga du Mardi</h5>
                         <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">Tous les mardis à 12h30</p>
-                        <button className="text-xs text-green-600 hover:underline">S'inscrire</button>
+                        <button 
+                            onClick={() => showNotification("Inscription enregistrée pour le Yoga du Mardi")}
+                            className="text-xs text-green-600 hover:underline"
+                        >
+                            S'inscrire
+                        </button>
                     </div>
                 </div>
               </div>
@@ -2586,9 +2674,9 @@ function App() {
                                                     setMediationDate('');
                                                     setIsMediationModalOpen(true);
                                                 }}
-                                                className="px-3 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded text-xs font-medium border border-purple-200 transition-colors flex items-center gap-1"
+                                                className="px-3 py-1.5 bg-purple-600 text-white hover:bg-purple-700 rounded text-xs font-medium border border-purple-600 transition-colors flex items-center gap-1"
                                             >
-                                                📅 Planifier Réunion
+                                                <Calendar className="w-3 h-3" /> Planifier Réunion
                                             </button>
                                             <button 
                                                 onClick={() => {
@@ -2596,9 +2684,9 @@ function App() {
                                                     setCaseNote('');
                                                     setIsCaseNoteModalOpen(true);
                                                 }}
-                                                className="px-3 py-1.5 bg-brand-bg/50 text-brand-dark hover:bg-brand-bg rounded text-xs font-medium border border-brand-primary/30 transition-colors flex items-center gap-1"
+                                                className="px-3 py-1.5 bg-brand-primary text-white hover:bg-brand-dark rounded text-xs font-medium border border-brand-primary transition-colors flex items-center gap-1"
                                             >
-                                                📝 Note Manager
+                                                <FileText className="w-3 h-3" /> Note Manager
                                             </button>
                                             <button 
                                                 onClick={() => {
@@ -2606,9 +2694,9 @@ function App() {
                                                     setSanctionDesc('');
                                                     setIsSanctionModalOpen(true);
                                                 }}
-                                                className="px-3 py-1.5 bg-red-50 text-red-700 hover:bg-red-100 rounded text-xs font-medium border border-red-200 transition-colors"
+                                                className="px-3 py-1.5 bg-red-600 text-white hover:bg-red-700 rounded text-xs font-medium border border-red-600 transition-colors flex items-center gap-1"
                                             >
-                                                ⚠️ Sanction
+                                                <Gavel className="w-3 h-3" /> Sanction
                                             </button>
                                         </div>
                                     </div>
@@ -2648,19 +2736,19 @@ function App() {
                     <div className="bg-brand-bg/50 dark:bg-brand-dark/20 p-5 rounded-xl border border-brand-primary/20 dark:border-brand-dark">
                         <h4 className="font-bold text-brand-dark dark:text-brand-primary/70 mb-3 text-sm uppercase">Charte de Médiation</h4>
                         <ul className="space-y-3">
-                            <li className="flex gap-3 text-sm text-brand-dark dark:text-brand-primary/30">
+                            <li className="flex gap-3 text-sm text-brand-dark dark:text-white">
                                 <span className="font-bold bg-brand-primary/20 dark:bg-brand-dark w-6 h-6 flex items-center justify-center rounded-full text-xs shrink-0">1</span>
                                 <span>Neutralité absolue du médiateur RH.</span>
                             </li>
-                            <li className="flex gap-3 text-sm text-brand-dark dark:text-brand-primary/30">
+                            <li className="flex gap-3 text-sm text-brand-dark dark:text-white">
                                 <span className="font-bold bg-brand-primary/20 dark:bg-brand-dark w-6 h-6 flex items-center justify-center rounded-full text-xs shrink-0">2</span>
                                 <span>Confidentialité des échanges garantie.</span>
                             </li>
-                            <li className="flex gap-3 text-sm text-brand-dark dark:text-brand-primary/30">
+                            <li className="flex gap-3 text-sm text-brand-dark dark:text-white">
                                 <span className="font-bold bg-brand-primary/20 dark:bg-brand-dark w-6 h-6 flex items-center justify-center rounded-full text-xs shrink-0">3</span>
                                 <span>Recherche de solutions amiables prioritaire.</span>
                             </li>
-                            <li className="flex gap-3 text-sm text-brand-dark dark:text-brand-primary/30">
+                            <li className="flex gap-3 text-sm text-brand-dark dark:text-white">
                                 <span className="font-bold bg-brand-primary/20 dark:bg-brand-dark w-6 h-6 flex items-center justify-center rounded-full text-xs shrink-0">4</span>
                                 <span>Formalisation écrite des accords trouvés.</span>
                             </li>
@@ -2802,7 +2890,12 @@ function App() {
                     <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
                         <div className="flex justify-between items-center mb-4">
                             <h4 className="font-bold text-gray-800 dark:text-white">Planning Équipes</h4>
-                            <button className="text-xs text-brand-primary hover:underline">Gérer</button>
+                            <button 
+                                onClick={() => setIsScheduleModalOpen(true)}
+                                className="text-xs text-brand-primary hover:underline"
+                            >
+                                Gérer
+                            </button>
                         </div>
                         <div className="space-y-3">
                             {schedules.map(schedule => {
@@ -2823,7 +2916,10 @@ function App() {
                     <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-xl border border-orange-100 dark:border-orange-800">
                         <h4 className="font-bold text-orange-800 dark:text-orange-300 mb-2">Justifications Requises</h4>
                         <p className="text-sm text-orange-700 dark:text-orange-400 mb-3">2 retards non justifiés cette semaine.</p>
-                        <button className="w-full py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors text-sm font-medium">
+                        <button 
+                            onClick={() => showNotification("Rappels envoyés aux employés concernés")}
+                            className="w-full py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors text-sm font-medium"
+                        >
                             Envoyer rappels
                         </button>
                     </div>
@@ -2832,116 +2928,7 @@ function App() {
           </div>
         );
 
-      case 'culture':
-        return (
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300 border border-gray-100 dark:border-gray-700 animate-fade-in">
-            <div className="text-center mb-8">
-                <h3 className="text-3xl font-bold text-brand-primary dark:text-white mb-2">Ben Yaacoub Company</h3>
-                <p className="text-gray-600 dark:text-gray-300 italic">"Innover ensemble pour un avenir meilleur"</p>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="bg-gradient-to-br from-brand-primary to-brand-primary/80 p-6 rounded-xl text-white shadow-lg transform hover:scale-105 transition-transform">
-                    <div className="text-4xl mb-4 opacity-80">🚀</div>
-                    <h4 className="text-xl font-bold mb-2">Innovation</h4>
-                    <p className="text-white/80 text-sm">Nous repoussons sans cesse les limites de la technologie pour créer de la valeur.</p>
-                </div>
-                <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-6 rounded-xl text-white shadow-lg transform hover:scale-105 transition-transform">
-                    <div className="text-4xl mb-4 opacity-80">🤝</div>
-                    <h4 className="text-xl font-bold mb-2">Esprit d'Équipe</h4>
-                    <p className="text-purple-100 text-sm">La collaboration et le soutien mutuel sont au cœur de notre réussite collective.</p>
-                </div>
-                <div className="bg-gradient-to-br from-green-500 to-green-600 p-6 rounded-xl text-white shadow-lg transform hover:scale-105 transition-transform">
-                    <div className="text-4xl mb-4 opacity-80">🌱</div>
-                    <h4 className="text-xl font-bold mb-2">Responsabilité</h4>
-                    <p className="text-green-100 text-sm">Nous agissons avec intégrité et nous engageons pour un impact positif durable.</p>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 space-y-6">
-                    <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
-                        <h4 className="font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-                            <svg className="w-5 h-5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"></path></svg>
-                            Actualités & Annonces
-                        </h4>
-                        <div className="space-y-4">
-                            {posts.filter(p => p.author === 'Direction' || p.author === "Comité d'entreprise").map(post => (
-                                <div key={post.id} className="flex gap-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-100 dark:border-gray-700">
-                                    <div className="flex-shrink-0">
-                                        <div className="w-12 h-12 bg-brand-bg dark:bg-brand-dark text-brand-primary dark:text-brand-primary/70 rounded-full flex items-center justify-center font-bold text-xl">
-                                            📢
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <div className="flex justify-between items-start mb-1">
-                                            <h5 className="font-bold text-gray-800 dark:text-white">{post.author}</h5>
-                                            <span className="text-xs text-gray-500">{new Date(post.date).toLocaleDateString()}</span>
-                                        </div>
-                                        <p className="text-gray-600 dark:text-gray-300 text-sm">{post.content}</p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
-                        <h4 className="font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-                            <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                            Événements à venir
-                        </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {events.map(event => (
-                                <div key={event.id} className="border border-gray-200 dark:border-gray-600 rounded-lg p-3 hover:shadow-md transition-shadow">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <span className="text-xs font-bold px-2 py-1 bg-purple-100 text-purple-800 rounded-full">{event.type}</span>
-                                        <span className="text-sm font-bold text-gray-500">{new Date(event.date).toLocaleDateString()}</span>
-                                    </div>
-                                    <h5 className="font-bold text-gray-800 dark:text-white mb-1">{event.title}</h5>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                                        {event.location}
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="lg:col-span-1">
-                    <div className="bg-gray-50 dark:bg-gray-700/30 p-4 rounded-xl border border-gray-200 dark:border-gray-700 h-full">
-                        <h4 className="font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-                            <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                            Espace Info & Ressources
-                        </h4>
-                        <div className="space-y-3">
-                            {resources.map(resource => (
-                                <div key={resource.id} className="bg-white dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-600 flex items-center justify-between group cursor-pointer hover:border-brand-primary/50 transition-colors">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 bg-red-100 text-red-600 rounded flex items-center justify-center font-bold text-xs">
-                                            {resource.type}
-                                        </div>
-                                        <div>
-                                            <p className="font-semibold text-gray-800 dark:text-white text-sm group-hover:text-brand-primary transition-colors">{resource.title}</p>
-                                            <p className="text-xs text-gray-500">{resource.size} • {new Date(resource.date).toLocaleDateString()}</p>
-                                        </div>
-                                    </div>
-                                    <svg className="w-4 h-4 text-gray-400 group-hover:text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="mt-6 p-4 bg-brand-bg/50 dark:bg-brand-dark/20 rounded-lg border border-brand-primary/20 dark:border-brand-dark">
-                            <h5 className="font-bold text-brand-dark dark:text-brand-primary/70 text-sm mb-2">Besoin d'aide ?</h5>
-                            <p className="text-xs text-brand-primary dark:text-white mb-3">Contactez le support RH pour toute question administrative.</p>
-                            <button className="w-full py-2 bg-brand-primary hover:bg-brand-primary/90 text-white shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 text-xs font-bold rounded transition-colors">
-                                Contacter RH
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-          </div>
-        );
 
       case 'compensation':
         return (
@@ -3027,7 +3014,16 @@ function App() {
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
                         Grilles Salariales 2025
                     </h4>
-                    <button className="text-sm text-brand-primary hover:underline">Mettre à jour</button>
+                    <button 
+                        onClick={() => {
+                            setEditingSalaryGrid(null);
+                            setNewSalaryGrid({ role: '', min: '', max: '', currency: 'DT' });
+                            setIsSalaryGridModalOpen(true);
+                        }}
+                        className="text-sm text-brand-primary hover:underline"
+                    >
+                        Ajouter / Mettre à jour
+                    </button>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
@@ -3048,7 +3044,16 @@ function App() {
                                     <td className="px-4 py-3">{grid.max}</td>
                                     <td className="px-4 py-3">{grid.currency}</td>
                                     <td className="px-4 py-3">
-                                        <button className="text-brand-primary hover:underline">Éditer</button>
+                                        <button 
+                                            onClick={() => {
+                                                setEditingSalaryGrid(grid);
+                                                setNewSalaryGrid({ ...grid });
+                                                setIsSalaryGridModalOpen(true);
+                                            }}
+                                            className="text-brand-primary hover:underline"
+                                        >
+                                            Éditer
+                                        </button>
                                     </td>
                                 </tr>
                             ))}
@@ -3092,7 +3097,7 @@ function App() {
                             <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
                             Accidents de Travail
                         </h4>
-                        <button className="text-sm bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded transition-colors">Déclarer</button>
+                        <button onClick={() => setIsNewAccidentModalOpen(true)} className="text-sm bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded transition-colors">Déclarer</button>
                     </div>
                     <div className="space-y-3">
                         {accidents.map(acc => {
@@ -3121,7 +3126,7 @@ function App() {
                             <svg className="w-5 h-5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                             Suivi Médical
                         </h4>
-                        <button className="text-sm text-brand-primary hover:underline">Planifier visite</button>
+                        <button onClick={() => setIsNewMedicalVisitModalOpen(true)} className="text-sm text-brand-primary hover:underline">Planifier visite</button>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
@@ -3180,10 +3185,13 @@ function App() {
 
                 {/* Formations Sécurité */}
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
-                    <h4 className="font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-                        <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
-                        Formations Sécurité
-                    </h4>
+                    <div className="flex justify-between items-center mb-4">
+                        <h4 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                            <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                            Formations Sécurité
+                        </h4>
+                        <button onClick={() => setIsNewSafetyTrainingModalOpen(true)} className="text-sm text-green-600 hover:underline">Planifier</button>
+                    </div>
                     <div className="space-y-3">
                         {safetyTrainings.map(training => (
                             <div key={training.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded border border-gray-100 dark:border-gray-600">
@@ -3373,7 +3381,7 @@ function App() {
                     <h3 className="text-xl font-bold text-gray-800 dark:text-white">Marque Employeur & Communication</h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400">Rayonnement interne et externe de l'entreprise</p>
                 </div>
-                <button className="bg-brand-primary hover:bg-brand-secondary text-white shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                <button onClick={() => setIsNewPostModalOpen(true)} className="bg-brand-primary hover:bg-brand-secondary text-white shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
                     + Nouvelle Publication
                 </button>
             </div>
@@ -3386,34 +3394,22 @@ function App() {
                             <span className="text-xl">📢</span> Communication Interne
                         </h4>
                         <div className="space-y-4">
-                            <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-100 dark:border-gray-600 shadow-sm">
-                                <div className="flex justify-between items-start mb-2">
-                                    <span className="bg-brand-bg text-brand-primary text-xs font-bold px-2 py-1 rounded">Annonce</span>
-                                    <span className="text-xs text-gray-400">Il y a 2 heures</span>
+                            {posts.map(post => (
+                                <div key={post.id} className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-100 dark:border-gray-600 shadow-sm">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <span className="bg-brand-bg text-brand-primary text-xs font-bold px-2 py-1 rounded">Annonce</span>
+                                        <span className="text-xs text-gray-400">{new Date(post.date).toLocaleDateString()}</span>
+                                    </div>
+                                    <h5 className="font-bold text-gray-800 dark:text-white mb-1">{post.author}</h5>
+                                    <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
+                                        {post.content}
+                                    </p>
+                                    <div className="flex items-center gap-4 text-xs text-gray-500">
+                                        <span className="flex items-center gap-1">❤️ {post.likes || 0} J'aime</span>
+                                        <span className="flex items-center gap-1">💬 {post.comments ? post.comments.length : 0} Commentaires</span>
+                                    </div>
                                 </div>
-                                <h5 className="font-bold text-gray-800 dark:text-white mb-1">Lancement du projet "Green Office" 🌿</h5>
-                                <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
-                                    Nous sommes ravis d'annoncer notre nouvelle initiative écologique. Des bacs de recyclage sont désormais disponibles à chaque étage.
-                                </p>
-                                <div className="flex items-center gap-4 text-xs text-gray-500">
-                                    <span className="flex items-center gap-1">❤️ 12 J'aime</span>
-                                    <span className="flex items-center gap-1">💬 3 Commentaires</span>
-                                </div>
-                            </div>
-                            <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-100 dark:border-gray-600 shadow-sm">
-                                <div className="flex justify-between items-start mb-2">
-                                    <span className="bg-purple-100 text-purple-800 text-xs font-bold px-2 py-1 rounded">Événement</span>
-                                    <span className="text-xs text-gray-400">Hier</span>
-                                </div>
-                                <h5 className="font-bold text-gray-800 dark:text-white mb-1">Afterwork Jeudi Prochain ! 🎉</h5>
-                                <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
-                                    Rejoignez-nous pour un moment de convivialité sur le rooftop à partir de 18h. Inscriptions ouvertes.
-                                </p>
-                                <div className="flex items-center gap-4 text-xs text-gray-500">
-                                    <span className="flex items-center gap-1">❤️ 24 J'aime</span>
-                                    <span className="flex items-center gap-1">💬 8 Commentaires</span>
-                                </div>
-                            </div>
+                            ))}
                         </div>
                     </div>
 
@@ -3516,7 +3512,7 @@ function App() {
                                 </div>
                             </li>
                         </ul>
-                        <button className="w-full mt-4 py-2 text-xs text-brand-primary border border-brand-primary/20 rounded hover:bg-brand-bg transition-colors">
+                        <button onClick={() => setIsCalendarModalOpen(true)} className="w-full mt-4 py-2 text-xs text-brand-primary border border-brand-primary/20 rounded hover:bg-brand-bg transition-colors">
                             Voir le calendrier complet
                         </button>
                     </div>
@@ -3532,7 +3528,7 @@ function App() {
                             <span className="text-xs text-purple-900 dark:text-purple-200">Candidatures</span>
                             <span className="font-bold text-purple-800 dark:text-white">45</span>
                         </div>
-                        <button className="w-full mt-3 py-1.5 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 transition-colors">
+                        <button onClick={() => showNotification("Redirection vers l'administration...")} className="w-full mt-3 py-1.5 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 transition-colors">
                             Gérer la page
                         </button>
                     </div>
@@ -4031,6 +4027,10 @@ function App() {
     }
   };
 
+  if (showWebsite && !user) {
+    return <CorporateWebsite onLoginClick={() => setShowWebsite(false)} />;
+  }
+
   if (!user) {
     return <Login onLogin={handleLogin} />;
   }
@@ -4170,11 +4170,7 @@ function App() {
                       : 'text-white hover:bg-slate-800 hover:text-gray-200'
                   }`} onClick={() => setCurrentPage('sst')}>Santé & Sécurité</li>
 
-                  <li className={`px-6 py-3 cursor-pointer transition-colors ${
-                    currentPage === 'culture' 
-                      ? 'bg-slate-800 text-white border-r-4 border-brand-primary' 
-                      : 'text-white hover:bg-slate-800 hover:text-gray-200'
-                  }`} onClick={() => setCurrentPage('culture')}>Culture & Info</li>
+
 
                   <li className={`px-6 py-3 cursor-pointer transition-colors ${
                     currentPage === 'strategy' 
@@ -4425,17 +4421,53 @@ function App() {
       {isTrainingNeedModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 animate-fade-in p-4">
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6">
-            <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Nouveau besoin de formation</h3>
-            <input type="text" value={newTrainingNeed} onChange={(e) => setNewTrainingNeed(e.target.value)} placeholder="Description du besoin" className="w-full p-3 border rounded-lg mb-4 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-            <div className="flex justify-end gap-3">
+            <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Détecter un besoin de formation</h3>
+            <div className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description du besoin</label>
+                    <textarea 
+                        value={newTrainingNeed.description} 
+                        onChange={(e) => setNewTrainingNeed({...newTrainingNeed, description: e.target.value})} 
+                        placeholder="Ex: Formation React Avancé pour l'équipe Frontend..." 
+                        className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white h-24"
+                    />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Priorité</label>
+                    <select 
+                        value={newTrainingNeed.priority} 
+                        onChange={(e) => setNewTrainingNeed({...newTrainingNeed, priority: e.target.value})}
+                        className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    >
+                        <option value="Haute">Haute</option>
+                        <option value="Moyenne">Moyenne</option>
+                        <option value="Faible">Faible</option>
+                    </select>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Département concerné</label>
+                    <select 
+                        value={newTrainingNeed.department} 
+                        onChange={(e) => setNewTrainingNeed({...newTrainingNeed, department: e.target.value})}
+                        className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    >
+                        <option value="">Sélectionner...</option>
+                        <option value="Engineering">Engineering</option>
+                        <option value="Design">Design</option>
+                        <option value="Marketing">Marketing</option>
+                        <option value="RH">Ressources Humaines</option>
+                    </select>
+                </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
               <button onClick={() => setIsTrainingNeedModalOpen(false)} className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">Annuler</button>
               <button onClick={() => {
-                if (newTrainingNeed) {
+                if (newTrainingNeed.description) {
                   showNotification("Besoin ajouté au plan de formation");
                   setIsTrainingNeedModalOpen(false);
-                  setNewTrainingNeed('');
+                  setNewTrainingNeed({ description: '', priority: 'Moyenne', department: '' });
                 }
-              }} className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Ajouter</button>
+              }} className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Soumettre</button>
             </div>
           </div>
         </div>
@@ -4444,28 +4476,222 @@ function App() {
       {/* New Training Modal */}
       {isNewTrainingModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 animate-fade-in p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full p-6">
             <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Nouvelle Session de Formation</h3>
-            <input type="text" value={newTrainingTitle} onChange={(e) => setNewTrainingTitle(e.target.value)} placeholder="Titre de la formation" className="w-full p-3 border rounded-lg mb-4 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-            <div className="flex justify-end gap-3">
+            <div className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Titre de la formation</label>
+                    <input 
+                        type="text" 
+                        value={newTraining.title} 
+                        onChange={(e) => setNewTraining({...newTraining, title: e.target.value})} 
+                        placeholder="Ex: Workshop Design System" 
+                        className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
+                    />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
+                        <select 
+                            value={newTraining.type} 
+                            onChange={(e) => setNewTraining({...newTraining, type: e.target.value})}
+                            className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        >
+                            <option value="Interne">Interne</option>
+                            <option value="Externe">Externe</option>
+                            <option value="E-Learning">E-Learning</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Durée</label>
+                        <input 
+                            type="text" 
+                            value={newTraining.duration} 
+                            onChange={(e) => setNewTraining({...newTraining, duration: e.target.value})} 
+                            placeholder="Ex: 2 jours" 
+                            className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
+                        />
+                    </div>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date de début</label>
+                    <input 
+                        type="date" 
+                        value={newTraining.date} 
+                        onChange={(e) => setNewTraining({...newTraining, date: e.target.value})} 
+                        className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
+                    />
+                </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
               <button onClick={() => setIsNewTrainingModalOpen(false)} className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">Annuler</button>
               <button onClick={() => {
-                if (newTrainingTitle) {
-                  const newTraining = { 
+                if (newTraining.title) {
+                  const trainingToAdd = { 
                     id: trainings.length + 1, 
-                    title: newTrainingTitle, 
-                    type: "Interne", 
-                    duration: "1 jour", 
+                    ...newTraining,
                     participants: [], 
-                    status: "Planifié", 
-                    date: "2026-01-01" 
+                    status: "Planifié"
                   };
-                  setTrainings([...trainings, newTraining]);
-                  showNotification("Formation créée");
+                  setTrainings([...trainings, trainingToAdd]);
+                  showNotification("Formation créée avec succès");
                   setIsNewTrainingModalOpen(false);
-                  setNewTrainingTitle('');
+                  setNewTraining({ title: '', type: 'Interne', duration: '', date: '', participants: [] });
                 }
-              }} className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Créer</button>
+              }} className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Créer la session</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Catalog Modal */}
+      {isCatalogModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 animate-fade-in p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-4xl w-full p-6 max-h-[90vh] overflow-y-auto">
+            {!selectedCourse ? (
+                <>
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-bold text-gray-800 dark:text-white">Catalogue de Formation</h3>
+                    <button onClick={() => setIsCatalogModalOpen(false)} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {[
+                        { title: "React Avancé", category: "Technique", duration: "10h", level: "Avancé", description: "Maîtrisez les hooks, le contexte et les patterns avancés de React.", modules: ["Hooks avancés", "Context API", "Performance", "Testing"] },
+                        { title: "Leadership 101", category: "Soft Skills", duration: "5h", level: "Débutant", description: "Les bases du management et du leadership pour les nouveaux managers.", modules: ["Communication", "Délégation", "Motivation", "Feedback"] },
+                        { title: "Sécurité des Données", category: "Sécurité", duration: "2h", level: "Tous", description: "Sensibilisation à la sécurité des données et aux bonnes pratiques.", modules: ["Phishing", "Mots de passe", "RGPD", "Sécurité physique"] },
+                        { title: "Anglais des Affaires", category: "Langues", duration: "20h", level: "Intermédiaire", description: "Améliorez votre anglais professionnel pour les réunions et présentations.", modules: ["Vocabulaire", "Emails", "Réunions", "Présentations"] },
+                        { title: "Gestion de Projet Agile", category: "Méthodologie", duration: "15h", level: "Intermédiaire", description: "Comprendre et appliquer les méthodes agiles (Scrum, Kanban).", modules: ["Manifeste Agile", "Scrum", "Kanban", "Rôles"] },
+                        { title: "UX Design Fundamentals", category: "Design", duration: "8h", level: "Débutant", description: "Les principes fondamentaux de l'expérience utilisateur.", modules: ["Recherche utilisateur", "Prototypage", "Tests", "Accessibilité"] }
+                    ].map((course, idx) => (
+                        <div key={idx} className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 hover:shadow-lg transition-shadow bg-gray-50 dark:bg-gray-700/50">
+                            <div className="flex justify-between items-start mb-2">
+                                <span className="px-2 py-1 bg-brand-bg text-brand-dark text-xs font-bold rounded-full">{course.category}</span>
+                                <span className="text-xs text-gray-500 dark:text-gray-400">{course.duration}</span>
+                            </div>
+                            <h4 className="font-bold text-gray-800 dark:text-white mb-2">{course.title}</h4>
+                            <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">Niveau: {course.level}</p>
+                            <button 
+                                onClick={() => setSelectedCourse(course)}
+                                className="w-full py-2 bg-white dark:bg-gray-800 border border-brand-primary text-brand-primary rounded-lg hover:bg-brand-bg transition-colors text-sm font-medium"
+                            >
+                                Voir le programme
+                            </button>
+                        </div>
+                    ))}
+                </div>
+                </>
+            ) : (
+                <div className="animate-fade-in">
+                    <button onClick={() => setSelectedCourse(null)} className="mb-4 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 flex items-center gap-1">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
+                        Retour au catalogue
+                    </button>
+                    <div className="flex justify-between items-start mb-6">
+                        <div>
+                            <h3 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">{selectedCourse.title}</h3>
+                            <div className="flex gap-2">
+                                <span className="px-2 py-1 bg-brand-bg text-brand-dark text-xs font-bold rounded-full">{selectedCourse.category}</span>
+                                <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-bold rounded-full">{selectedCourse.level}</span>
+                                <span className="px-2 py-1 bg-blue-100 text-blue-600 text-xs font-bold rounded-full">{selectedCourse.duration}</span>
+                            </div>
+                        </div>
+                        <button onClick={() => {
+                            showNotification(`Inscription à ${selectedCourse.title} validée`);
+                            setIsCatalogModalOpen(false);
+                            setSelectedCourse(null);
+                        }} className="px-6 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 shadow-md hover:shadow-lg transition-all">
+                            S'inscrire
+                        </button>
+                    </div>
+                    
+                    <div className="space-y-6">
+                        <div>
+                            <h4 className="font-bold text-gray-800 dark:text-white mb-2">Description</h4>
+                            <p className="text-gray-600 dark:text-gray-300">{selectedCourse.description}</p>
+                        </div>
+                        
+                        <div>
+                            <h4 className="font-bold text-gray-800 dark:text-white mb-3">Programme du cours</h4>
+                            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+                                <ul className="space-y-3">
+                                    {selectedCourse.modules.map((module, idx) => (
+                                        <li key={idx} className="flex items-center gap-3">
+                                            <div className="w-6 h-6 rounded-full bg-brand-bg text-brand-primary flex items-center justify-center text-xs font-bold">
+                                                {idx + 1}
+                                            </div>
+                                            <span className="text-gray-700 dark:text-gray-200">{module}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Matrix Modal */}
+      {isMatrixModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 animate-fade-in p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-5xl w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-gray-800 dark:text-white">Matrice des Compétences</h3>
+                <button onClick={() => setIsMatrixModalOpen(false)} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+                    <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                        <tr>
+                            <th className="px-6 py-3">Employé</th>
+                            <th className="px-6 py-3 text-center">React</th>
+                            <th className="px-6 py-3 text-center">Node.js</th>
+                            <th className="px-6 py-3 text-center">Python</th>
+                            <th className="px-6 py-3 text-center">Design</th>
+                            <th className="px-6 py-3 text-center">Management</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {employees.map(emp => (
+                            <tr key={emp.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                <td className="px-6 py-4 font-medium text-gray-900 dark:text-white whitespace-nowrap">
+                                    {emp.username}
+                                    <div className="text-xs text-gray-500">{emp.role}</div>
+                                </td>
+                                <td className="px-6 py-4 text-center">
+                                    <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+                                        <div className="bg-blue-600 h-2.5 rounded-full" style={{width: `${Math.floor(Math.random() * 40 + 60)}%`}}></div>
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4 text-center">
+                                    <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+                                        <div className="bg-green-600 h-2.5 rounded-full" style={{width: `${Math.floor(Math.random() * 40 + 60)}%`}}></div>
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4 text-center">
+                                    <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+                                        <div className="bg-yellow-400 h-2.5 rounded-full" style={{width: `${Math.floor(Math.random() * 40 + 60)}%`}}></div>
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4 text-center">
+                                    <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+                                        <div className="bg-purple-600 h-2.5 rounded-full" style={{width: `${Math.floor(Math.random() * 40 + 60)}%`}}></div>
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4 text-center">
+                                    <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+                                        <div className="bg-red-600 h-2.5 rounded-full" style={{width: `${Math.floor(Math.random() * 40 + 60)}%`}}></div>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
             </div>
           </div>
         </div>
@@ -4476,18 +4702,48 @@ function App() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 animate-fade-in p-4">
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6">
             <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Ajouter un participant</h3>
-            <input type="number" value={participantIdToAdd} onChange={(e) => setParticipantIdToAdd(e.target.value)} placeholder="ID de l'employé" className="w-full p-3 border rounded-lg mb-4 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+            <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Rechercher un employé</label>
+                <input 
+                    type="text" 
+                    value={participantSearchQuery} 
+                    onChange={(e) => setParticipantSearchQuery(e.target.value)} 
+                    placeholder="Nom ou ID..." 
+                    className="w-full p-3 border rounded-lg mb-3 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                />
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Sélectionner un employé</label>
+                <select 
+                    value={participantIdToAdd} 
+                    onChange={(e) => setParticipantIdToAdd(e.target.value)} 
+                    className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    size={5}
+                >
+                    <option value="">-- Choisir un employé --</option>
+                    {employees
+                        .filter(emp => 
+                            emp.username.toLowerCase().includes(participantSearchQuery.toLowerCase()) || 
+                            emp.id.toString().includes(participantSearchQuery)
+                        )
+                        .map(emp => (
+                        <option key={emp.id} value={emp.id} disabled={trainingToAddTo.participants.includes(emp.id)}>
+                            {emp.username} {trainingToAddTo.participants.includes(emp.id) ? '(Déjà inscrit)' : ''}
+                        </option>
+                    ))}
+                </select>
+            </div>
             <div className="flex justify-end gap-3">
-              <button onClick={() => setIsAddParticipantModalOpen(false)} className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">Annuler</button>
+              <button onClick={() => {
+                  setIsAddParticipantModalOpen(false);
+                  setParticipantSearchQuery('');
+              }} className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">Annuler</button>
               <button onClick={() => {
                 const empId = parseInt(participantIdToAdd);
-                if (employees.find(e => e.id === empId)) {
+                if (empId) {
                   setTrainings(trainings.map(t => t.id === trainingToAddTo.id ? { ...t, participants: [...t.participants, empId] } : t));
                   showNotification("Participant ajouté");
                   setIsAddParticipantModalOpen(false);
                   setParticipantIdToAdd('');
-                } else {
-                  showNotification("Employé introuvable");
+                  setParticipantSearchQuery('');
                 }
               }} className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Ajouter</button>
             </div>
@@ -4500,12 +4756,27 @@ function App() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 animate-fade-in p-4">
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6">
             <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Nouvel Objectif</h3>
+            <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type d'objectif</label>
+                <select 
+                    value={newGoalType} 
+                    onChange={(e) => setNewGoalType(e.target.value)}
+                    className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                >
+                    <option value="Technique">Technique</option>
+                    <option value="Soft Skills">Soft Skills</option>
+                    <option value="Projet">Projet</option>
+                    <option value="Formation">Formation</option>
+                    <option value="Management">Management</option>
+                </select>
+            </div>
             <input type="text" value={newGoalText} onChange={(e) => setNewGoalText(e.target.value)} placeholder="Description de l'objectif" className="w-full p-3 border rounded-lg mb-4 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
             <div className="flex justify-end gap-3">
               <button onClick={() => setIsAddGoalModalOpen(false)} className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">Annuler</button>
               <button onClick={() => {
                 if (newGoalText) {
-                  setEvaluations(evaluations.map(ev => ev.id === evalForGoal.id ? { ...ev, goals: [...ev.goals, newGoalText] } : ev));
+                  const formattedGoal = `[${newGoalType}] ${newGoalText}`;
+                  setEvaluations(evaluations.map(ev => ev.id === evalForGoal.id ? { ...ev, goals: [...ev.goals, formattedGoal] } : ev));
                   showNotification("Objectif ajouté");
                   setIsAddGoalModalOpen(false);
                   setNewGoalText('');
@@ -4802,6 +5073,79 @@ function App() {
         </div>
       )}
 
+      {/* Salary Grid Modal */}
+      {isSalaryGridModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 animate-fade-in p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">
+                {editingSalaryGrid ? 'Modifier la Grille Salariale' : 'Nouvelle Grille Salariale'}
+            </h3>
+            
+            <div className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Niveau / Rôle</label>
+                    <input 
+                        type="text" 
+                        value={newSalaryGrid.role} 
+                        onChange={(e) => setNewSalaryGrid({...newSalaryGrid, role: e.target.value})} 
+                        className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
+                        placeholder="Ex: Junior, Senior..."
+                    />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Salaire Min</label>
+                        <input 
+                            type="number" 
+                            value={newSalaryGrid.min} 
+                            onChange={(e) => setNewSalaryGrid({...newSalaryGrid, min: e.target.value})} 
+                            className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Salaire Max</label>
+                        <input 
+                            type="number" 
+                            value={newSalaryGrid.max} 
+                            onChange={(e) => setNewSalaryGrid({...newSalaryGrid, max: e.target.value})} 
+                            className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
+                        />
+                    </div>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Devise</label>
+                    <select 
+                        value={newSalaryGrid.currency} 
+                        onChange={(e) => setNewSalaryGrid({...newSalaryGrid, currency: e.target.value})} 
+                        className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    >
+                        <option value="DT">DT (Dinar Tunisien)</option>
+                        <option value="EUR">EUR (Euro)</option>
+                        <option value="USD">USD (Dollar)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={() => setIsSalaryGridModalOpen(false)} className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">Annuler</button>
+              <button onClick={() => {
+                if (editingSalaryGrid) {
+                    // Update existing
+                    setSalaryGrids(salaryGrids.map(g => g.id === editingSalaryGrid.id ? { ...newSalaryGrid, id: editingSalaryGrid.id } : g));
+                    showNotification("Grille salariale mise à jour");
+                } else {
+                    // Add new
+                    const newId = Math.max(...salaryGrids.map(g => g.id), 0) + 1;
+                    setSalaryGrids([...salaryGrids, { ...newSalaryGrid, id: newId }]);
+                    showNotification("Nouvelle grille ajoutée");
+                }
+                setIsSalaryGridModalOpen(false);
+              }} className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Enregistrer</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Offboarding Modal */}
       {isOffboardingModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 animate-fade-in p-4">
@@ -4836,10 +5180,173 @@ function App() {
             <div className="flex justify-center gap-3">
               <button onClick={() => setIsReportModalOpen(false)} className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">Annuler</button>
               <button onClick={() => {
+                if (reportType === 'absences' || reportType === 'risks') {
+                    const doc = new jsPDF();
+                    doc.setFontSize(20);
+                    doc.text(reportType === 'absences' ? "Rapport d'Absences" : "Rapport d'Analyse des Risques", 20, 20);
+                    doc.setFontSize(12);
+                    doc.text(`Généré le : ${new Date().toLocaleDateString()}`, 20, 30);
+                    
+                    if (reportType === 'absences') {
+                        let y = 50;
+                        absences.forEach((abs, index) => {
+                            const emp = employees.find(e => e.id === abs.employeeId);
+                            doc.text(`${index + 1}. ${emp ? emp.username : 'Inconnu'} - ${abs.type} (${abs.startDate} au ${abs.endDate})`, 20, y);
+                            y += 10;
+                        });
+                    } else {
+                        doc.text("Risques identifiés : Départ élevé dans l'équipe Tech.", 20, 50);
+                        doc.text("Besoins en compétences : IA (+15%), Cybersécurité (+10%)", 20, 60);
+                    }
+                    doc.save(`rapport_${reportType}.pdf`);
+                } else if (reportType === 'payroll') {
+                    let csvContent = "data:text/csv;charset=utf-8,";
+                    csvContent += "Employé,Mois,Salaire Base,Heures,Primes\n";
+                    payrollData.forEach(row => {
+                        const emp = employees.find(e => e.id === row.employeeId);
+                        csvContent += `${emp ? emp.username : 'Inconnu'},${row.month},${row.baseSalary},${row.hoursWorked},${row.bonuses}\n`;
+                    });
+                    const encodedUri = encodeURI(csvContent);
+                    const link = document.createElement("a");
+                    link.setAttribute("href", encodedUri);
+                    link.setAttribute("download", "rapport_paie.csv");
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }
                 showNotification(`Rapport ${reportType === 'absences' ? "d'absences" : reportType === 'payroll' ? "de paie" : "d'analyse"} généré avec succès`);
                 setIsReportModalOpen(false);
               }} className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Télécharger</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Schedule Management Modal */}
+      {isScheduleModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 animate-fade-in p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">
+              {editingSchedule ? "Modifier l'horaire" : "Gestion du Planning"}
+            </h3>
+            
+            {!editingSchedule ? (
+              <div className="space-y-4">
+                <div className="flex justify-end">
+                  <button 
+                    onClick={() => {
+                      setNewSchedule({ employeeId: '', week: '', monday: '', tuesday: '', wednesday: '', thursday: '', friday: '' });
+                      setEditingSchedule({ isNew: true });
+                    }}
+                    className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 text-sm"
+                  >
+                    + Ajouter un horaire
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {schedules.map(schedule => {
+                    const emp = employees.find(e => e.id === schedule.employeeId);
+                    return (
+                      <div key={schedule.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-100 dark:border-gray-600">
+                        <div>
+                          <p className="font-bold text-gray-800 dark:text-white">{emp ? emp.username : 'Employé Inconnu'}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Semaine: {schedule.week}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => {
+                              setNewSchedule({ ...schedule });
+                              setEditingSchedule(schedule);
+                            }}
+                            className="text-blue-600 hover:text-blue-800 text-sm"
+                          >
+                            Modifier
+                          </button>
+                          <button 
+                            onClick={() => {
+                              setSchedules(schedules.filter(s => s.id !== schedule.id));
+                              showNotification("Horaire supprimé");
+                            }}
+                            className="text-red-600 hover:text-red-800 text-sm"
+                          >
+                            Supprimer
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex justify-end mt-4">
+                  <button onClick={() => setIsScheduleModalOpen(false)} className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">Fermer</button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Employé</label>
+                    <select 
+                      value={newSchedule.employeeId} 
+                      onChange={(e) => setNewSchedule({...newSchedule, employeeId: parseInt(e.target.value)})}
+                      className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    >
+                      <option value="">Sélectionner un employé</option>
+                      {employees.map(emp => (
+                        <option key={emp.id} value={emp.id}>{emp.username}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Semaine</label>
+                    <input 
+                      type="text" 
+                      value={newSchedule.week} 
+                      onChange={(e) => setNewSchedule({...newSchedule, week: e.target.value})}
+                      placeholder="ex: 2025-W49"
+                      className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  {['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].map(day => (
+                    <div key={day}>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 capitalize">{day === 'monday' ? 'Lundi' : day === 'tuesday' ? 'Mardi' : day === 'wednesday' ? 'Mercredi' : day === 'thursday' ? 'Jeudi' : 'Vendredi'}</label>
+                      <input 
+                        type="text" 
+                        value={newSchedule[day]} 
+                        onChange={(e) => setNewSchedule({...newSchedule, [day]: e.target.value})}
+                        placeholder="09:00-18:00"
+                        className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-end gap-3 mt-6">
+                  <button 
+                    onClick={() => setEditingSchedule(null)} 
+                    className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                  >
+                    Retour
+                  </button>
+                  <button 
+                    onClick={() => {
+                      if (editingSchedule.isNew) {
+                        const newId = Math.max(...schedules.map(s => s.id), 0) + 1;
+                        setSchedules([...schedules, { ...newSchedule, id: newId }]);
+                        showNotification("Nouvel horaire ajouté");
+                      } else {
+                        setSchedules(schedules.map(s => s.id === editingSchedule.id ? newSchedule : s));
+                        showNotification("Horaire mis à jour");
+                      }
+                      setEditingSchedule(null);
+                    }} 
+                    className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5"
+                  >
+                    Enregistrer
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -4916,6 +5423,347 @@ function App() {
               >
                 Fermer
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Certification Modal */}
+      {isCertificationModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 animate-fade-in p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Ajouter une certification</h3>
+            <div className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nom de la certification</label>
+                    <input 
+                        type="text" 
+                        value={newCertificationName} 
+                        onChange={(e) => setNewCertificationName(e.target.value)} 
+                        placeholder="Ex: AWS Solutions Architect" 
+                        className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
+                    />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Couleur du badge</label>
+                    <div className="flex gap-2">
+                        {['yellow', 'brand', 'red', 'green', 'blue', 'gray'].map(color => (
+                            <button
+                                key={color}
+                                onClick={() => setNewCertificationColor(color)}
+                                className={`w-8 h-8 rounded-full border-2 ${
+                                    newCertificationColor === color ? 'border-gray-800 dark:border-white scale-110' : 'border-transparent'
+                                } ${
+                                    color === 'yellow' ? 'bg-yellow-100' :
+                                    color === 'brand' ? 'bg-brand-bg' :
+                                    color === 'red' ? 'bg-red-100' :
+                                    color === 'green' ? 'bg-green-100' :
+                                    color === 'blue' ? 'bg-blue-100' :
+                                    'bg-gray-100'
+                                }`}
+                            />
+                        ))}
+                    </div>
+                </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={() => setIsCertificationModalOpen(false)} className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">Annuler</button>
+              <button onClick={() => {
+                if (newCertificationName) {
+                  const newCert = { 
+                    id: certifications.length + 1, 
+                    name: newCertificationName, 
+                    color: newCertificationColor 
+                  };
+                  setCertifications([...certifications, newCert]);
+                  showNotification("Certification ajoutée");
+                  setIsCertificationModalOpen(false);
+                  setNewCertificationName('');
+                  setNewCertificationColor('gray');
+                }
+              }} className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Ajouter</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Evaluation Modal */}
+      {isNewEvaluationModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 animate-fade-in p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full p-6">
+            <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Nouvelle Évaluation</h3>
+            <div className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Employé</label>
+                    <select 
+                        value={newEvaluation.employeeId} 
+                        onChange={(e) => setNewEvaluation({...newEvaluation, employeeId: parseInt(e.target.value)})}
+                        className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    >
+                        <option value="">Sélectionner un employé</option>
+                        {employees.map(emp => (
+                            <option key={emp.id} value={emp.id}>{emp.username}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
+                        <select 
+                            value={newEvaluation.type} 
+                            onChange={(e) => setNewEvaluation({...newEvaluation, type: e.target.value})}
+                            className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        >
+                            <option value="Annuel">Annuel</option>
+                            <option value="Trimestriel">Trimestriel</option>
+                            <option value="Probatoire">Probatoire</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Année</label>
+                        <input 
+                            type="number" 
+                            value={newEvaluation.year} 
+                            onChange={(e) => setNewEvaluation({...newEvaluation, year: parseInt(e.target.value)})} 
+                            className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
+                        />
+                    </div>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date prévue</label>
+                    <input 
+                        type="date" 
+                        value={newEvaluation.date} 
+                        onChange={(e) => setNewEvaluation({...newEvaluation, date: e.target.value})} 
+                        className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
+                    />
+                </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={() => setIsNewEvaluationModalOpen(false)} className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">Annuler</button>
+              <button onClick={() => {
+                if (newEvaluation.employeeId && newEvaluation.date) {
+                  const evaluationToAdd = { 
+                    id: evaluations.length + 1, 
+                    ...newEvaluation,
+                    status: "Planifié",
+                    reviewer: user.username,
+                    goals: [],
+                    feedback: []
+                  };
+                  setEvaluations([...evaluations, evaluationToAdd]);
+                  showNotification("Évaluation planifiée avec succès");
+                  setIsNewEvaluationModalOpen(false);
+                  setNewEvaluation({ employeeId: '', type: 'Annuel', year: new Date().getFullYear(), date: '', goals: [] });
+                } else {
+                    showNotification("Veuillez remplir tous les champs obligatoires");
+                }
+              }} className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">Planifier</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Accident Modal */}
+      {isNewAccidentModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 animate-fade-in p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full p-6">
+            <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Déclarer un Accident</h3>
+            <div className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Employé concerné</label>
+                    <select 
+                        value={newAccident.employeeId} 
+                        onChange={(e) => setNewAccident({...newAccident, employeeId: parseInt(e.target.value)})}
+                        className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    >
+                        <option value="">Sélectionner un employé</option>
+                        {employees.map(emp => (
+                            <option key={emp.id} value={emp.id}>{emp.username}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date</label>
+                        <input 
+                            type="date" 
+                            value={newAccident.date} 
+                            onChange={(e) => setNewAccident({...newAccident, date: e.target.value})} 
+                            className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Gravité</label>
+                        <select 
+                            value={newAccident.severity} 
+                            onChange={(e) => setNewAccident({...newAccident, severity: e.target.value})}
+                            className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        >
+                            <option value="Faible">Faible</option>
+                            <option value="Moyenne">Moyenne</option>
+                            <option value="Haute">Haute</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type d'accident</label>
+                    <input 
+                        type="text" 
+                        value={newAccident.type} 
+                        onChange={(e) => setNewAccident({...newAccident, type: e.target.value})} 
+                        placeholder="Ex: Chute, Coupure..."
+                        className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
+                    />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                    <textarea 
+                        value={newAccident.description} 
+                        onChange={(e) => setNewAccident({...newAccident, description: e.target.value})} 
+                        className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white h-24" 
+                    />
+                </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={() => setIsNewAccidentModalOpen(false)} className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">Annuler</button>
+              <button onClick={() => {
+                  showNotification("Accident déclaré avec succès");
+                  setIsNewAccidentModalOpen(false);
+                  setNewAccident({ employeeId: '', date: '', type: 'Chute', description: '', severity: 'Faible' });
+              }} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 shadow-md">Déclarer</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Medical Visit Modal */}
+      {isNewMedicalVisitModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 animate-fade-in p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Planifier Visite Médicale</h3>
+            <div className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Employé</label>
+                    <select 
+                        value={newMedicalVisit.employeeId} 
+                        onChange={(e) => setNewMedicalVisit({...newMedicalVisit, employeeId: parseInt(e.target.value)})}
+                        className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    >
+                        <option value="">Sélectionner un employé</option>
+                        {employees.map(emp => (
+                            <option key={emp.id} value={emp.id}>{emp.username}</option>
+                        ))}
+                    </select>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type de visite</label>
+                    <select 
+                        value={newMedicalVisit.type} 
+                        onChange={(e) => setNewMedicalVisit({...newMedicalVisit, type: e.target.value})}
+                        className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    >
+                        <option value="Visite périodique">Visite périodique</option>
+                        <option value="Visite d'embauche">Visite d'embauche</option>
+                        <option value="Visite de reprise">Visite de reprise</option>
+                    </select>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date prévue</label>
+                    <input 
+                        type="date" 
+                        value={newMedicalVisit.date} 
+                        onChange={(e) => setNewMedicalVisit({...newMedicalVisit, date: e.target.value})} 
+                        className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
+                    />
+                </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={() => setIsNewMedicalVisitModalOpen(false)} className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">Annuler</button>
+              <button onClick={() => {
+                  showNotification("Visite médicale planifiée");
+                  setIsNewMedicalVisitModalOpen(false);
+                  setNewMedicalVisit({ employeeId: '', date: '', type: 'Visite périodique' });
+              }} className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 shadow-md">Planifier</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Safety Training Modal */}
+      {isNewSafetyTrainingModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 animate-fade-in p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Nouvelle Formation Sécurité</h3>
+            <div className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Titre de la formation</label>
+                    <input 
+                        type="text" 
+                        value={newSafetyTraining.title} 
+                        onChange={(e) => setNewSafetyTraining({...newSafetyTraining, title: e.target.value})} 
+                        placeholder="Ex: Incendie, Gestes et Postures..."
+                        className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
+                    />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date</label>
+                    <input 
+                        type="date" 
+                        value={newSafetyTraining.date} 
+                        onChange={(e) => setNewSafetyTraining({...newSafetyTraining, date: e.target.value})} 
+                        className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
+                    />
+                </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={() => setIsNewSafetyTrainingModalOpen(false)} className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">Annuler</button>
+              <button onClick={() => {
+                  showNotification("Formation sécurité ajoutée");
+                  setIsNewSafetyTrainingModalOpen(false);
+                  setNewSafetyTraining({ title: '', date: '', participants: [] });
+              }} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 shadow-md">Ajouter</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Calendar Modal */}
+      {isCalendarModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 animate-fade-in p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full p-6">
+            <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-gray-800 dark:text-white">Calendrier des Événements</h3>
+                <button onClick={() => setIsCalendarModalOpen(false)} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                {events.length > 0 ? (
+                    events.map(event => (
+                        <div key={event.id} className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-100 dark:border-gray-600">
+                            <div className="bg-brand-bg text-brand-primary rounded-lg w-16 h-16 flex flex-col items-center justify-center shrink-0">
+                                <span className="text-xs font-bold uppercase">{new Date(event.date).toLocaleString('default', { month: 'short' })}</span>
+                                <span className="text-2xl font-bold leading-none">{new Date(event.date).getDate()}</span>
+                            </div>
+                            <div className="flex-1">
+                                <div className="flex justify-between items-start">
+                                    <h4 className="font-bold text-lg text-gray-800 dark:text-white">{event.title}</h4>
+                                    <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-bold rounded-full">{event.type}</span>
+                                </div>
+                                <p className="text-sm text-gray-600 dark:text-gray-300 flex items-center gap-2 mt-1">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                    {event.location}
+                                </p>
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                    <p className="text-center text-gray-500 dark:text-gray-400 py-8">Aucun événement prévu pour le moment.</p>
+                )}
+            </div>
+            <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-end">
+                <button onClick={() => setIsCalendarModalOpen(false)} className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 shadow-md">Fermer</button>
             </div>
           </div>
         </div>
